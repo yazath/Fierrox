@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FierroX Pro v1.6.5 - Cloud Stable</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: white; margin: 0; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .hidden { display: none !important; }
+        .active-icon { filter: drop-shadow(0px 0px 15px rgba(220,38,38,0.5)); transform: scale(1.1); }
+        .nav-item { transition: all 0.2s; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; }
+        input[type="file"] { display: none; }
+        .store-banner { height: 160px; background-size: cover; background-position: center; border-radius: 0 0 2rem 2rem; position: relative; background-color: #111; }
+        .profile-pic-store { width: 80px; height: 80px; border-radius: 50%; border: 4px solid #000; margin-top: -40px; object-fit: cover; background: #222; position: relative; z-index: 10; }
+        .tab-btn { font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 12px 0; border-bottom: 2px solid transparent; color: #444; flex: 1; }
+        .tab-btn.active { color: white; border-bottom: 2px solid #dc2626; }
+        .feed-card { background: rgba(255,255,255,0.03); border-radius: 1.5rem; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px; overflow: hidden; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <section id="login-screen" class="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center px-6">
+        <img src="barra logo.png" class="h-12 mb-10" onerror="this.src='https://via.placeholder.com/150x50?text=FierroX'">
+        <div class="glass p-8 rounded-[2.5rem] w-full max-w-sm">
+            <input type="email" id="login-email" placeholder="GMAIL" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl mb-4 text-center font-bold text-xs uppercase italic outline-none">
+            <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl mb-6 text-center font-bold text-xs uppercase italic outline-none">
+            <button onclick="iniciarSesion()" class="w-full bg-red-600 text-white font-black py-5 rounded-2xl text-xs tracking-widest italic">ENTRAR</button>
+            <p class="text-[10px] font-bold text-gray-500 italic mt-6 text-center uppercase">¿No tienes cuenta? <span class="text-white cursor-pointer underline" onclick="toggleAuth('register')">Regístrate</span></p>
+        </div>
+    </section>
+
+    <section id="register-screen" class="hidden fixed inset-0 z-[101] bg-black flex flex-col items-center justify-center px-6">
+        <div class="glass p-8 rounded-[2.5rem] w-full max-w-sm text-center">
+            <h2 class="text-red-600 font-black italic mb-6 uppercase">Nuevo Miembro</h2>
+            <label class="block mb-4 cursor-pointer">
+                <div id="reg-pic-box" class="w-20 h-20 bg-white/5 rounded-full mx-auto flex items-center justify-center border-2 border-dashed border-white/20 overflow-hidden">
+                    <i data-lucide="camera" id="reg-icon"></i>
+                    <img id="preview-user-pic" class="hidden w-full h-full object-cover">
+                </div>
+                <input type="file" accept="image/*" onchange="previewImage(this, 'preview-user-pic', 'reg-icon')">
+            </label>
+            <input type="text" id="reg-name" placeholder="NOMBRE" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl mb-3 text-center text-[10px] font-bold outline-none">
+            <input type="email" id="reg-email" placeholder="GMAIL" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl mb-3 text-center text-[10px] font-bold outline-none">
+            <input type="password" id="reg-pass" placeholder="PASSWORD" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl mb-6 text-center text-[10px] font-bold outline-none">
+            <button onclick="registrarUsuario()" class="w-full bg-white text-black font-black py-4 rounded-xl text-xs uppercase italic">Crear Cuenta</button>
+            <button onclick="toggleAuth('login')" class="text-[9px] text-gray-500 mt-4 uppercase font-bold">Volver</button>
+        </div>
+    </section>
+
+    <main id="main-content" class="hidden pb-32 pt-6 px-4">
+        <div id="section-title" class="mb-6 flex justify-center"></div>
+        <div id="section-body" class="max-w-md mx-auto"></div>
+    </main>
+
+    <section id="store-view" class="hidden fixed inset-0 z-[140] bg-black overflow-y-auto pb-32">
+        <div id="store-banner-v" class="store-banner">
+            <button onclick="cerrarSubSeccion('store-view')" class="absolute top-4 left-4 bg-black/50 p-2 rounded-full"><i data-lucide="arrow-left"></i></button>
+        </div>
+        <div class="px-6 text-center">
+            <img id="store-logo-v" class="profile-pic-store mx-auto">
+            <h2 id="store-name-v" class="text-xl font-black uppercase italic mt-2">TIENDA</h2>
+            <div class="grid grid-cols-3 gap-2 mt-6 mb-6">
+                <button onclick="abrirModal('modal-articulo')" class="bg-red-600 py-3 rounded-xl font-black italic text-[7px] uppercase">Articulo</button>
+                <button onclick="abrirModal('modal-servicio')" class="bg-blue-600 py-3 rounded-xl font-black italic text-[7px] uppercase">Servicio</button>
+                <button onclick="abrirModal('modal-post')" class="bg-white text-black py-3 rounded-xl font-black italic text-[7px] uppercase">Publicar</button>
+            </div>
+            <div class="flex border-b border-white/10 mb-6">
+                <button id="tab-inicio" onclick="cambiarPestaña('inicio')" class="tab-btn active">Inicio</button>
+                <button id="tab-tienda" onclick="cambiarPestaña('tienda')" class="tab-btn">Tienda</button>
+            </div>
+            <div id="store-content-area" class="grid grid-cols-2 gap-3"></div>
+        </div>
+    </section>
+
+    <nav id="nav-bar" class="hidden fixed bottom-0 left-0 right-0 glass border-t border-white/10 pb-8 pt-3 px-4 z-50">
+        <div class="flex justify-around items-center max-w-md mx-auto">
+            <div onclick="navegar('panel', this)" class="nav-item active-icon"><img src="barra logo.png" class="w-7"></div>
+            <div onclick="navegar('canastilla', this)" class="nav-item grayscale opacity-40"><img src="barra canastilla.png" class="w-7"></div>
+            <div onclick="navegar('buscador', this)" class="nav-item grayscale opacity-40"><img src="barra buscador.png" class="w-7"></div>
+            <div onclick="navegar('menu', this)" class="nav-item grayscale opacity-40"><img src="barra menu.png" class="w-7"></div>
+        </div>
+    </nav>
+
+    <script>
+        // CONFIGURACIÓN SUPABASE
+        const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
+        const SB_KEY = 'sb_publishable_rQfM6eBNu4ZnzIQBVDYpJg_3Xq0PKoV';
+        const _supabase = supabase.createClient(SB_URL, SB_KEY);
+
+        let uActivo = null;
+
+        // --- SISTEMA NUBE ---
+
+        async function iniciarSesion() {
+            const e = document.getElementById('login-email').value.toLowerCase();
+            const p = document.getElementById('login-pass').value;
+
+            const { data, error } = await _supabase
+                .from('Perfiles')
+                .select('*')
+                .eq('email', e)
+                .single();
+
+            if (data && data.pass === p) {
+                uActivo = data;
+                // Convertir campos JSON que vienen como texto desde Supabase si es necesario
+                uActivo.tienda = typeof data.tienda === 'string' ? JSON.parse(data.tienda) : data.tienda;
+                uActivo.prods = typeof data.prods === 'string' ? JSON.parse(data.prods) : data.prods || [];
+                uActivo.posts = typeof data.posts === 'string' ? JSON.parse(data.posts) : data.posts || [];
+
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+                document.getElementById('nav-bar').classList.remove('hidden');
+                navegar('panel', document.querySelector('.nav-item'));
+            } else {
+                alert("Gmail o contraseña incorrectos.");
+            }
+        }
+
+        async function registrarUsuario() {
+            const n = document.getElementById('reg-name').value;
+            const e = document.getElementById('reg-email').value.toLowerCase();
+            const p = document.getElementById('reg-pass').value;
+            const f = document.getElementById('preview-user-pic').src;
+
+            if(!e || !n || !p) return alert("Completa todo");
+
+            const { error } = await _supabase
+                .from('Perfiles')
+                .insert([{ 
+                    nombre: n, 
+                    email: e, 
+                    pass: p, 
+                    foto: f, 
+                    tienda: null, 
+                    prods: [], 
+                    posts: [] 
+                }]);
+
+            if(!error) {
+                alert("Cuenta creada en la nube");
+                toggleAuth('login');
+            } else {
+                alert("Error: " + error.message);
+            }
+        }
+
+        async function saveCloud() {
+            const { error } = await _supabase
+                .from('Perfiles')
+                .update({ 
+                    tienda: uActivo.tienda, 
+                    prods: uActivo.prods, 
+                    posts: uActivo.posts 
+                })
+                .eq('id', uActivo.id);
+            
+            if(error) console.log("Error al guardar:", error);
+        }
+
+        // --- LAS FUNCIONES DE TU DISEÑO AHORA USAN saveCloud() ---
+
+        function finalizarTienda() {
+            const n = document.getElementById('conf-name').value;
+            const l = document.getElementById('conf-logo-prev').src;
+            const b = document.getElementById('conf-banner-prev').src;
+            if(!n) return alert("Ponle nombre");
+            uActivo.tienda = { name: n, logo: l, banner: b };
+            saveCloud(); 
+            document.getElementById('modal-config').classList.add('hidden'); 
+            verTienda();
+        }
+
+        function guardarItem(tipo) {
+            const n = document.getElementById(tipo === 'articulo' ? 'art-name' : 'ser-name').value;
+            const p = tipo === 'articulo' ? document.getElementById('art-price').value : null;
+            const i = document.getElementById(tipo === 'articulo' ? 'art-img-preview' : 'ser-img-preview').src;
+            
+            uActivo.prods.push({ n, p, i, tipo });
+            saveCloud(); 
+            cerrarSubSeccion(`modal-${tipo}`); 
+            renderTiendaContenido('tienda');
+        }
+
+        function guardarPost() {
+            const d = document.getElementById('post-desc').value;
+            const i = document.getElementById('post-img-preview').src;
+            uActivo.posts.push({ id: Date.now(), d, i, likes: 0, likedBy: [], comments: [], shares: 0 });
+            saveCloud(); 
+            cerrarSubSeccion('modal-post'); 
+            renderTiendaContenido('inicio');
+        }
+
+        // ... [El resto de tus funciones navegar(), renderFeed(), etc., se quedan igual] ...
+
+        async function previewImage(input, targetId, labelId) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.getElementById(targetId);
+                    img.src = e.target.result;
+                    img.classList.remove('hidden');
+                    if(labelId) document.getElementById(labelId).classList.add('hidden');
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function toggleAuth(t) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('register-screen').classList.add('hidden');
+            document.getElementById(t + '-screen').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        window.onload = () => lucide.createIcons();
+    </script>
+</body>
+</html>
