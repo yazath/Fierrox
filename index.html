@@ -94,18 +94,17 @@ const _supabase = supabase.createClient(SB_URL, SB_KEY);
 let uActivo = null;
 let perfilViendo = null;
 let postActualComentando = null;
+let modoEdicion = false;
 
 // --- PERSISTENCIA Y LOGIN ---
 window.onload = async () => {
     const sesionGuardada = localStorage.getItem('sesion_fierrox');
     if (sesionGuardada) {
         uActivo = JSON.parse(sesionGuardada);
-        // Sincronizar datos frescos de la nube al iniciar
         const { data } = await _supabase.from('Perfiles').select('*').eq('id', uActivo.id).single();
         if(data) {
             uActivo = data;
             parseUserData(uActivo);
-            localStorage.setItem('sesion_fierrox', JSON.stringify(uActivo)); // Actualizar local
             entrarApp();
         }
     }
@@ -139,53 +138,40 @@ function parseUserData(user) {
 
 // --- NAVEGACIÓN ---
 function navegar(sec, el) {
+    modoEdicion = false;
     document.querySelectorAll('.nav-item').forEach(i => i.classList.add('grayscale', 'opacity-40'));
     if(el) el.classList.remove('grayscale', 'opacity-40');
     const body = document.getElementById('section-body');
     const tit = document.getElementById('section-title');
     
-    // Limpiar estado de perfil viendo al navegar al muro
-    if(sec === 'panel') perfilViendo = null;
-
     tit.innerHTML = (sec === 'panel') ? '<img src="barra logo.png" class="h-8">' : '';
-    if(sec === 'panel') cargarFeedGlobal(body);
+    if(sec === 'panel') { perfilViendo = null; cargarFeedGlobal(body); }
     else if(sec === 'menu') { perfilViendo = uActivo; renderPerfil(body, true); }
     lucide.createIcons();
 }
 
-// --- LÓGICA DE SEGUIDORES (CORREGIDA) ---
+// --- SISTEMA DE SEGUIDORES (CORRECCIÓN DEFINITIVA) ---
 async function toggleSeguir() {
-    if (!uActivo || !perfilViendo) return;
-
-    let listaSeguidores = [...perfilViendo.seguidores];
+    let lista = [...perfilViendo.seguidores];
     const miId = uActivo.id;
 
-    if (listaSeguidores.includes(miId)) {
-        // Dejar de seguir
-        listaSeguidores = listaSeguidores.filter(id => id !== miId);
-    } else {
-        // Seguir
-        listaSeguidores.push(miId);
-    }
+    if (lista.includes(miId)) lista = lista.filter(id => id !== miId);
+    else lista.push(miId);
 
-    // Actualizar en la base de datos del usuario al que estamos viendo
     const { error } = await _supabase
         .from('Perfiles')
-        .update({ seguidores: listaSeguidores })
+        .update({ seguidores: JSON.stringify(lista) })
         .eq('id', perfilViendo.id);
 
     if (!error) {
-        perfilViendo.seguidores = listaSeguidores;
-        // Refrescar la vista del perfil para ver el cambio de botón y contador
+        perfilViendo.seguidores = lista;
         renderPerfil(document.getElementById('section-body'), false);
-    } else {
-        alert("Error al actualizar seguidores");
-    }
+    } else { console.error(error); alert("Error de conexión con la base de datos."); }
 }
 
 // --- RENDERIZADO DE PERFIL ---
 function renderPerfil(container, esMio) {
-    const bannerImg = perfilViendo.tienda?.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1000&auto=format&fit=crop';
+    const bannerImg = perfilViendo.tienda?.banner || 'https://via.placeholder.com/600x200';
     const siguiendo = perfilViendo.seguidores.includes(uActivo.id);
 
     container.innerHTML = `
@@ -198,11 +184,14 @@ function renderPerfil(container, esMio) {
                 <div class="absolute top-4 right-4 z-50">
                     <button onclick="toggleMenuOptions()" class="bg-black/40 backdrop-blur-md p-3 rounded-2xl border border-white/10"><i data-lucide="menu" class="text-white w-6"></i></button>
                     <div id="drop-menu" class="hidden absolute right-0 mt-3 w-48 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                        <button onclick="activarModoEdicion()" class="w-full p-4 text-[10px] font-black text-white uppercase italic text-left border-b border-white/5">Editar Perfil</button>
                         <button onclick="verListaSeguidores()" class="w-full p-4 text-[10px] font-black text-white uppercase italic text-left border-b border-white/5">Seguidores</button>
                         <button onclick="cerrarSesion()" class="w-full p-4 text-[10px] font-black text-red-500 uppercase italic text-left">Cerrar Sesión</button>
                     </div>
-                </div>
-                <label class="absolute bottom-4 right-4 bg-white/10 p-2 rounded-full cursor-pointer backdrop-blur-md">
+                </div>` : ''}
+
+                ${modoEdicion && esMio ? `
+                <label class="absolute bottom-4 right-4 bg-red-600 p-2 rounded-full cursor-pointer shadow-lg animate-bounce">
                     <i data-lucide="camera" class="w-4 h-4 text-white"></i><input type="file" class="hidden" onchange="subirImg(this, 'banner')">
                 </label>` : ''}
             </div>
@@ -210,37 +199,50 @@ function renderPerfil(container, esMio) {
             <div class="absolute -bottom-14 left-1/2 -translate-x-1/2">
                 <div class="relative">
                     <img id="v-foto" src="${perfilViendo.foto}" class="w-32 h-32 rounded-full border-4 border-black object-cover shadow-2xl bg-black">
-                    ${esMio ? `<label class="absolute bottom-0 right-0 bg-red-600 p-2 rounded-full border-2 border-black cursor-pointer"><i data-lucide="edit-2" class="w-4 h-4 text-white"></i><input type="file" class="hidden" onchange="subirImg(this, 'foto')"></label>` : ''}
+                    ${modoEdicion && esMio ? `<label class="absolute bottom-0 right-0 bg-red-600 p-2 rounded-full border-2 border-black cursor-pointer shadow-lg"><i data-lucide="edit-2" class="w-4 h-4 text-white"></i><input type="file" class="hidden" onchange="subirImg(this, 'foto')"></label>` : ''}
                 </div>
             </div>
         </div>
 
         <div class="text-center mb-6">
-            <h2 class="text-2xl font-black italic uppercase text-white">${perfilViendo.nombre}</h2>
+            ${modoEdicion ? 
+                `<input id="edit-nombre" type="text" value="${perfilViendo.nombre}" class="bg-white/10 text-center text-xl font-black italic uppercase rounded-lg border border-red-600 outline-none p-1" onchange="actualizarNombre(this.value)">` :
+                `<h2 class="text-2xl font-black italic uppercase text-white">${perfilViendo.nombre}</h2>`
+            }
             <p class="text-[11px] font-black text-red-600 uppercase mt-2 tracking-widest">${perfilViendo.seguidores.length} SEGUIDORES</p>
-            ${!esMio ? `<button onclick="toggleSeguir()" class="mt-4 ${siguiendo ? 'bg-zinc-800 text-white border border-white/20' : 'bg-white text-black'} px-10 py-3 rounded-full font-black text-[11px] italic uppercase transition-all shadow-xl">
-                ${siguiendo ? 'SIGUIENDO' : 'SEGUIR'}
-            </button>` : ''}
+            ${!esMio ? `<button onclick="toggleSeguir()" class="mt-4 ${siguiendo ? 'bg-zinc-800 text-white' : 'bg-white text-black'} px-10 py-3 rounded-full font-black text-[11px] italic uppercase transition-all shadow-xl">${siguiendo ? 'SIGUIENDO' : 'SEGUIR'}</button>` : ''}
         </div>
+
+        ${esMio ? `
+        <div class="glass p-5 rounded-[2.5rem] mb-8 border border-white/5 shadow-2xl">
+            <textarea id="p-txt" placeholder="¿QUÉ QUIERES PUBLICAR?" class="w-full bg-transparent text-[11px] font-bold p-2 outline-none italic uppercase h-16 text-white"></textarea>
+            <div class="flex justify-between items-center mt-3 border-t border-white/10 pt-4">
+                <label class="cursor-pointer text-gray-400 hover:text-white transition-colors"><i data-lucide="image" class="w-6"></i><input type="file" class="hidden" onchange="previewP(this)"></label>
+                <button onclick="publicar()" class="bg-red-600 text-white px-8 py-2 rounded-full font-black text-[10px] italic shadow-lg shadow-red-600/20">POSTEAR</button>
+            </div>
+            <img id="p-prev" class="hidden w-full h-40 object-cover rounded-2xl mt-4 border border-white/10">
+        </div>` : ''}
 
         <div id="perfil-posts-cont" class="px-2 pb-20"></div>
     `;
-    
     const pCont = document.getElementById('perfil-posts-cont');
-    if(perfilViendo.posts.length > 0) {
-        perfilViendo.posts.forEach(p => { pCont.innerHTML += crearHTMLPost(p, perfilViendo); });
-    } else {
-        pCont.innerHTML = `<p class="text-center py-20 opacity-20 italic text-[10px] uppercase font-black">Sin publicaciones</p>`;
-    }
+    perfilViendo.posts.forEach(p => { pCont.innerHTML += crearHTMLPost(p, perfilViendo); });
     lucide.createIcons();
 }
 
-// --- RESTO DE FUNCIONES (MANTENIENDO CALIDAD) ---
-
+// --- GESTIÓN DE POSTS (CON MENÚ DE 3 PUNTOS) ---
 function crearHTMLPost(p, uData) {
     const liked = p.likes?.includes(uActivo.id);
+    const esMio = uData.id === uActivo.id;
     return `
-    <div class="feed-card mb-6 bg-zinc-900/40 rounded-[2.5rem] overflow-hidden border border-white/5 shadow-lg">
+    <div class="feed-card mb-6 bg-zinc-900/40 rounded-[2.5rem] overflow-hidden border border-white/5 shadow-xl relative">
+        ${esMio ? `
+        <div class="absolute top-5 right-5 z-20 group">
+            <button class="text-gray-500 p-2"><i data-lucide="more-vertical" class="w-5"></i></button>
+            <div class="hidden group-hover:block absolute right-0 bg-black border border-white/10 rounded-xl overflow-hidden shadow-2xl w-32">
+                <button onclick="eliminarPost(${p.id})" class="w-full p-3 text-[9px] font-black text-red-500 uppercase italic text-left hover:bg-white/5">Eliminar</button>
+            </div>
+        </div>` : ''}
         <div class="p-5 flex items-center gap-3">
             <img onclick="verPerfilPublico(${uData.id})" src="${uData.foto}" class="w-10 h-10 rounded-full object-cover border border-white/10 cursor-pointer">
             <span onclick="verPerfilPublico(${uData.id})" class="text-[11px] font-black italic uppercase cursor-pointer">${uData.nombre}</span>
@@ -255,12 +257,41 @@ function crearHTMLPost(p, uData) {
                 <button onclick="abrirComentarios(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black text-gray-400">
                     <i data-lucide="message-circle" class="w-5"></i> ${p.comentarios?.length || 0}
                 </button>
-                <button onclick="compartir(${p.id})" class="flex items-center gap-2 text-[10px] font-black text-gray-400"><i data-lucide="share-2" class="w-5"></i></button>
+                <button onclick="compartir()" class="flex items-center gap-2 text-[10px] font-black text-gray-400"><i data-lucide="share-2" class="w-5"></i></button>
             </div>
         </div>
     </div>`;
 }
 
+// --- FUNCIONES DE EDICIÓN Y PUBLICACIÓN ---
+function activarModoEdicion() { modoEdicion = true; renderPerfil(document.getElementById('section-body'), true); toggleMenuOptions(); }
+
+async function actualizarNombre(val) {
+    uActivo.nombre = val;
+    await _supabase.from('Perfiles').update({ nombre: val }).eq('id', uActivo.id);
+}
+
+async function publicar() {
+    const txt = document.getElementById('p-txt').value;
+    const img = document.getElementById('p-prev');
+    if(!txt && img.classList.contains('hidden')) return;
+
+    const post = { id: Date.now(), d: txt, i: img.classList.contains('hidden') ? null : img.src, likes: [], comentarios: [] };
+    uActivo.posts.unshift(post);
+    await _supabase.from('Perfiles').update({ posts: JSON.stringify(uActivo.posts) }).eq('id', uActivo.id);
+    document.getElementById('p-txt').value = "";
+    img.classList.add('hidden');
+    renderPerfil(document.getElementById('section-body'), true);
+}
+
+async function eliminarPost(id) {
+    if(!confirm("¿Eliminar publicación?")) return;
+    uActivo.posts = uActivo.posts.filter(p => p.id !== id);
+    await _supabase.from('Perfiles').update({ posts: JSON.stringify(uActivo.posts) }).eq('id', uActivo.id);
+    renderPerfil(document.getElementById('section-body'), true);
+}
+
+// --- SOPORTE Y FEED ---
 async function cargarFeedGlobal(container) {
     const { data } = await _supabase.from('Perfiles').select('*');
     let todos = [];
@@ -278,34 +309,35 @@ async function verPerfilPublico(id) {
     if(data) { perfilViendo = data; parseUserData(perfilViendo); renderPerfil(document.getElementById('section-body'), false); }
 }
 
-function toggleMenuOptions() { 
-    const menu = document.getElementById('drop-menu');
-    menu.classList.toggle('hidden');
-}
-
-async function verListaSeguidores() {
-    if (uActivo.seguidores.length === 0) return alert("Aún no tienes seguidores");
-    let nombres = "TE SIGUEN:\n";
-    const { data } = await _supabase.from('Perfiles').select('nombre').in('id', uActivo.seguidores);
-    if(data) {
-        data.forEach(u => nombres += "• " + u.nombre + "\n");
-        alert(nombres);
-    }
-}
-
 async function subirImg(input, tipo) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = async (e) => {
             const base = e.target.result;
             if(tipo === 'foto') { uActivo.foto = base; await _supabase.from('Perfiles').update({ foto: base }).eq('id', uActivo.id); }
-            else { uActivo.tienda.banner = base; await _supabase.from('Perfiles').update({ tienda: uActivo.tienda }).eq('id', uActivo.id); }
+            else { uActivo.tienda.banner = base; await _supabase.from('Perfiles').update({ tienda: JSON.stringify({banner: base}) }).eq('id', uActivo.id); }
             renderPerfil(document.getElementById('section-body'), true);
         };
         reader.readAsDataURL(input.files[0]);
     }
 }
 
+function previewP(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const p = document.getElementById('p-prev');
+            p.src = e.target.result; p.classList.remove('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function toggleMenuOptions() { document.getElementById('drop-menu').classList.toggle('hidden'); }
+function cerrarSesion() { localStorage.removeItem('sesion_fierrox'); location.reload(); }
+function compartir() { alert("¡Enlace copiado!"); }
+
+// --- COMENTARIOS Y LIKES ---
 async function darLike(userId, postId) {
     const { data } = await _supabase.from('Perfiles').select('posts').eq('id', userId).single();
     let posts = typeof data.posts === 'string' ? JSON.parse(data.posts) : data.posts;
@@ -317,17 +349,13 @@ async function darLike(userId, postId) {
         }
         return p;
     });
-    await _supabase.from('Perfiles').update({ posts }).eq('id', userId);
+    await _supabase.from('Perfiles').update({ posts: JSON.stringify(posts) }).eq('id', userId);
     if(perfilViendo) {
-        // Si estamos en un perfil, recargamos el perfil viendo para actualizar el like
         const { data: dNew } = await _supabase.from('Perfiles').select('*').eq('id', perfilViendo.id).single();
         perfilViendo = dNew; parseUserData(perfilViendo);
         renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
     } else { navegar('panel'); }
 }
-
-function cerrarSesion() { localStorage.removeItem('sesion_fierrox'); location.reload(); }
-function compartir() { alert("¡Enlace copiado!"); }
 
 async function abrirComentarios(userId, postId) {
     postActualComentando = { userId, postId };
@@ -374,7 +402,7 @@ async function enviarComentario() {
         }
         return p;
     });
-    await _supabase.from('Perfiles').update({ posts }).eq('id', userId);
+    await _supabase.from('Perfiles').update({ posts: JSON.stringify(posts) }).eq('id', userId);
     document.getElementById('modal-comentarios').remove();
     if(perfilViendo) {
         const { data: dNew } = await _supabase.from('Perfiles').select('*').eq('id', perfilViendo.id).single();
@@ -382,8 +410,9 @@ async function enviarComentario() {
         renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
     } else { navegar('panel'); }
 }
- 
-                        
+
+
+            
 
     </script>
 </body>
