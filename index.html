@@ -87,204 +87,211 @@
     </nav>
 
     <script>
-       // CONFIGURACIÓN SUPABASE
-const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
+     const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
 const SB_KEY = 'sb_publishable_rQfM6eBNu4ZnzIQBVDYpJg_3Xq0PKoV';
 const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
 let uActivo = null;
+let perfilViendo = null; // Para saber qué perfil estamos visitando
 
-// --- INICIO DE SESIÓN ---
 async function iniciarSesion() {
     const e = document.getElementById('login-email').value.toLowerCase();
     const p = document.getElementById('login-pass').value;
-
-    const { data, error } = await _supabase
-        .from('Perfiles')
-        .select('*')
-        .eq('email', e)
-        .single();
+    const { data } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
 
     if (data && data.pass === p) {
         uActivo = data;
-        uActivo.prods = typeof data.prods === 'string' ? JSON.parse(data.prods) : data.prods || [];
-        uActivo.posts = typeof data.posts === 'string' ? JSON.parse(data.posts) : data.posts || [];
-        uActivo.tienda = typeof data.tienda === 'string' ? JSON.parse(data.tienda) : data.tienda || {};
-        
+        parseUserData(uActivo);
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
         document.getElementById('nav-bar').classList.remove('hidden');
-        
         navegar('panel', document.querySelector('.nav-item'));
-    } else {
-        alert("Credenciales incorrectas.");
-    }
+    } else { alert("Error al entrar"); }
 }
 
-// --- NAVEGACIÓN ---
+function parseUserData(user) {
+    user.prods = typeof user.prods === 'string' ? JSON.parse(user.prods) : user.prods || [];
+    user.posts = typeof user.posts === 'string' ? JSON.parse(user.posts) : user.posts || [];
+    user.tienda = typeof user.tienda === 'string' ? JSON.parse(user.tienda) : user.tienda || {};
+    user.seguidores = typeof user.seguidores === 'string' ? JSON.parse(user.seguidores) : user.seguidores || [];
+}
+
 function navegar(sec, el) {
-    document.querySelectorAll('.nav-item').forEach(i => {
-        i.classList.add('grayscale', 'opacity-40');
-        i.classList.remove('active-icon');
-    });
-    el.classList.remove('grayscale', 'opacity-40');
-    el.classList.add('active-icon');
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.add('grayscale', 'opacity-40'));
+    if(el) el.classList.remove('grayscale', 'opacity-40');
     
     const body = document.getElementById('section-body');
     const tit = document.getElementById('section-title');
+    tit.innerHTML = ''; // Eliminamos títulos superiores
 
     if(sec === 'panel') {
         tit.innerHTML = '<img src="barra logo.png" class="h-8">';
         cargarMuro(body);
-    } 
-    else if(sec === 'menu') {
-        tit.innerHTML = '<span class="font-black italic text-red-600">MI PERFIL</span>';
-        renderMiPerfil(body);
-    } 
-    else {
-        body.innerHTML = '<p class="text-center py-20 opacity-20 italic font-black">Próximamente...</p>';
+    } else if(sec === 'menu') {
+        verPerfilPrivado();
     }
     lucide.createIcons();
 }
 
-// --- DISEÑO TIPO FACEBOOK ---
-function renderMiPerfil(container) {
+// --- VISUALIZACIÓN DE PERFILES ---
+
+function verPerfilPrivado() {
+    perfilViendo = uActivo;
+    renderPerfil(document.getElementById('section-body'), true);
+}
+
+async function verPerfilPublico(userId) {
+    const { data } = await _supabase.from('Perfiles').select('*').eq('id', userId).single();
+    if(data) {
+        perfilViendo = data;
+        parseUserData(perfilViendo);
+        renderPerfil(document.getElementById('section-body'), false);
+    }
+}
+
+function renderPerfil(container, esMio) {
+    const bannerImg = perfilViendo.tienda?.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1000&auto=format&fit=crop';
+    
     container.innerHTML = `
-        <div class="relative mb-20">
-            <div class="w-full h-40 bg-zinc-900 rounded-b-[2rem] overflow-hidden relative border-b border-white/10">
-                <img id="view-banner" src="${uActivo.tienda?.banner || 'https://via.placeholder.com/600x200?text=Banner'}" class="w-full h-full object-cover">
-                <label class="absolute bottom-2 right-4 bg-black/60 p-2 rounded-xl cursor-pointer backdrop-blur-md">
-                    <i data-lucide="camera" class="w-4 h-4"></i>
-                    <input type="file" class="hidden" onchange="subirImagen(this, 'banner')">
-                </label>
+        <div class="relative -mx-4 mb-20">
+            <div class="w-full h-56 relative overflow-hidden">
+                <img id="v-banner" src="${bannerImg}" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+                ${esMio ? `
+                <label class="absolute bottom-4 right-4 bg-white/10 backdrop-blur-md p-2 rounded-full cursor-pointer">
+                    <i data-lucide="camera" class="w-4 h-4 text-white"></i>
+                    <input type="file" class="hidden" onchange="subirImg(this, 'banner')">
+                </label>` : ''}
             </div>
             
-            <div class="absolute -bottom-16 left-1/2 -translate-x-1/2">
+            <div class="absolute -bottom-14 left-1/2 -translate-x-1/2">
                 <div class="relative">
-                    <img id="view-perfil" src="${uActivo.foto}" class="w-32 h-32 rounded-full border-4 border-black object-cover shadow-2xl">
+                    <img id="v-foto" src="${perfilViendo.foto}" class="w-28 h-28 rounded-full border-4 border-black object-cover bg-black">
+                    ${esMio ? `
                     <label class="absolute bottom-0 right-0 bg-red-600 p-2 rounded-full cursor-pointer border-2 border-black">
-                        <i data-lucide="edit-2" class="w-4 h-4"></i>
-                        <input type="file" class="hidden" onchange="subirImagen(this, 'foto')">
-                    </label>
+                        <i data-lucide="edit-2" class="w-3 h-3"></i>
+                        <input type="file" class="hidden" onchange="subirImg(this, 'foto')">
+                    </label>` : ''}
                 </div>
             </div>
         </div>
 
-        <div class="text-center px-6 mb-8">
-            <input type="text" id="edit-nombre" value="${uActivo.nombre}" 
-                class="bg-transparent text-xl font-black italic uppercase text-center w-full outline-none border-b border-transparent focus:border-red-600 mb-1"
-                onchange="actualizarNombre(this.value)">
-            <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">${uActivo.email}</p>
+        <div class="text-center mb-6">
+            <h2 class="text-xl font-black italic uppercase">${perfilViendo.nombre}</h2>
+            <p class="text-[10px] font-bold text-red-600 tracking-tighter uppercase mt-1">
+                ${perfilViendo.seguidores.length} SEGUIDORES
+            </p>
+            ${!esMio ? `
+                <button onclick="toggleSeguir()" class="mt-4 bg-white text-black px-8 py-2 rounded-full font-black text-[10px] italic uppercase">
+                    ${perfilViendo.seguidores.includes(uActivo.id) ? 'SIGUIENDO' : 'SEGUIR'}
+                </button>
+            ` : ''}
         </div>
 
+        ${esMio ? `
         <div class="glass p-4 rounded-[2rem] mb-6">
-            <textarea id="nuevo-post-txt" placeholder="¿Qué estás pensando?" class="w-full bg-transparent text-xs font-bold p-2 outline-none italic uppercase h-20"></textarea>
+            <textarea id="p-txt" placeholder="¿QUÉ HAY DE NUEVO?" class="w-full bg-transparent text-[10px] font-bold p-2 outline-none italic uppercase h-16"></textarea>
             <div class="flex justify-between items-center mt-2 border-t border-white/5 pt-3">
-                <label class="flex items-center gap-2 text-[9px] font-black cursor-pointer text-gray-400">
-                    <i data-lucide="image" class="w-4 h-4"></i> AGREGAR FOTO
-                    <input type="file" id="post-file" class="hidden" onchange="previewPostImg(this)">
-                </label>
-                <button onclick="guardarPublicacion()" class="bg-white text-black px-6 py-2 rounded-full font-black text-[10px] italic">PUBLICAR</button>
+                <label class="cursor-pointer text-gray-500"><i data-lucide="image" class="w-5"></i><input type="file" class="hidden" onchange="previewP(this)"></label>
+                <button onclick="publicar()" class="bg-red-600 text-white px-6 py-2 rounded-xl font-black text-[9px] italic">POSTEAR</button>
             </div>
-            <img id="post-preview" class="hidden w-full h-32 object-cover rounded-xl mt-3">
-        </div>
+            <img id="p-prev" class="hidden w-full h-32 object-cover rounded-xl mt-3">
+        </div>` : ''}
 
-        <button onclick="location.reload()" class="w-full py-4 text-[9px] font-black text-gray-600 uppercase italic">Cerrar Sesión</button>
+        <div id="perfil-posts" class="space-y-4"></div>
     `;
+    renderPosts(perfilViendo.posts, 'perfil-posts', perfilViendo);
     lucide.createIcons();
 }
 
-// --- FUNCIONES DE CARGA Y ACTUALIZACIÓN ---
+// --- LÓGICA DE INTERACCIÓN ---
 
-async function subirImagen(input, tipo) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const base64 = e.target.result;
-            if(tipo === 'foto') {
-                uActivo.foto = base64;
-                document.getElementById('view-perfil').src = base64;
-                await _supabase.from('Perfiles').update({ foto: base64 }).eq('id', uActivo.id);
-            } else {
-                uActivo.tienda.banner = base64;
-                document.getElementById('view-banner').src = base64;
-                await _supabase.from('Perfiles').update({ tienda: uActivo.tienda }).eq('id', uActivo.id);
-            }
-        };
-        reader.readAsDataURL(input.files[0]);
+async function toggleSeguir() {
+    let lista = perfilViendo.seguidores;
+    if(lista.includes(uActivo.id)) {
+        lista = lista.filter(id => id !== uActivo.id);
+    } else {
+        lista.push(uActivo.id);
     }
-}
-
-async function actualizarNombre(nuevoNombre) {
-    uActivo.nombre = nuevoNombre;
-    await _supabase.from('Perfiles').update({ nombre: nuevoNombre }).eq('id', uActivo.id);
-}
-
-function previewPostImg(input) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const prev = document.getElementById('post-preview');
-            prev.src = e.target.result;
-            prev.classList.remove('hidden');
-        };
-        reader.readAsDataURL(input.files[0]);
-    }
-}
-
-async function guardarPublicacion() {
-    const texto = document.getElementById('nuevo-post-txt').value;
-    const imgElement = document.getElementById('post-preview');
-    
-    if(!texto && imgElement.classList.contains('hidden')) return alert("Escribe algo");
-
-    const nuevoPost = {
-        id: Date.now(),
-        d: texto,
-        i: imgElement.classList.contains('hidden') ? null : imgElement.src,
-        fecha: new Date().toISOString()
-    };
-
-    uActivo.posts.unshift(nuevoPost);
-    
-    const { error } = await _supabase
-        .from('Perfiles')
-        .update({ posts: uActivo.posts })
-        .eq('id', uActivo.id);
-
-    if(!error) {
-        alert("Publicado con éxito");
-        navegar('panel', document.querySelector('.nav-item'));
-    }
+    await _supabase.from('Perfiles').update({ seguidores: lista }).eq('id', perfilViendo.id);
+    perfilViendo.seguidores = lista;
+    renderPerfil(document.getElementById('section-body'), false);
 }
 
 async function cargarMuro(container) {
-    const { data } = await _supabase.from('Perfiles').select('nombre, foto, posts');
-    let totalPosts = [];
-    if(data) {
-        data.forEach(u => {
-            const ps = typeof u.posts === 'string' ? JSON.parse(u.posts) : u.posts || [];
-            ps.forEach(p => totalPosts.push({ ...p, uNombre: u.nombre, uFoto: u.foto }));
-        });
-        
-        // Ordenar por fecha (más recientes primero)
-        totalPosts.sort((a, b) => b.id - a.id);
-
-        container.innerHTML = totalPosts.map(p => `
-            <div class="feed-card">
-                <div class="p-4 flex items-center gap-2">
-                    <img src="${p.uFoto}" class="w-8 h-8 rounded-full object-cover border border-white/10">
-                    <span class="text-[10px] font-black italic uppercase">${p.uNombre}</span>
-                </div>
-                ${p.i ? `<img src="${p.i}" class="w-full object-cover max-h-96">` : ''}
-                <div class="p-4">
-                    <p class="text-[11px] font-medium italic text-gray-200">${p.d}</p>
+    const { data } = await _supabase.from('Perfiles').select('*');
+    let todos = [];
+    data.forEach(u => {
+        const ps = typeof u.posts === 'string' ? JSON.parse(u.posts) : u.posts || [];
+        ps.forEach(p => todos.push({ ...p, uData: u }));
+    });
+    todos.sort((a, b) => b.id - a.id);
+    
+    container.innerHTML = todos.map(p => `
+        <div class="feed-card mb-6">
+            <div class="p-4 flex items-center gap-3">
+                <img onclick="verPerfilPublico(${p.uData.id})" src="${p.uData.foto}" class="w-9 h-9 rounded-full object-cover cursor-pointer border border-white/10">
+                <span onclick="verPerfilPublico(${p.uData.id})" class="text-[10px] font-black italic uppercase cursor-pointer">${p.uData.nombre}</span>
+            </div>
+            ${p.i ? `<img src="${p.i}" class="w-full object-cover max-h-[400px]">` : ''}
+            <div class="p-4">
+                <p class="text-[11px] font-medium text-gray-200 mb-4">${p.d}</p>
+                <div class="flex justify-between border-t border-white/5 pt-4">
+                    <button class="flex items-center gap-1 text-[9px] font-black text-gray-400"><i data-lucide="heart" class="w-4"></i> LIKE</button>
+                    <button class="flex items-center gap-1 text-[9px] font-black text-gray-400"><i data-lucide="message-circle" class="w-4"></i> COMENTAR</button>
+                    <button class="flex items-center gap-1 text-[9px] font-black text-gray-400"><i data-lucide="share-2" class="w-4"></i> SHARE</button>
                 </div>
             </div>
-        `).join('') || '<p class="text-center py-20 opacity-20 italic">No hay publicaciones</p>';
-    }
+        </div>
+    `).join('');
     lucide.createIcons();
 }
+
+// --- SOPORTE ---
+
+async function subirImg(input, tipo) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base = e.target.result;
+            if(tipo === 'foto') {
+                uActivo.foto = base;
+                await _supabase.from('Perfiles').update({ foto: base }).eq('id', uActivo.id);
+            } else {
+                uActivo.tienda.banner = base;
+                await _supabase.from('Perfiles').update({ tienda: uActivo.tienda }).eq('id', uActivo.id);
+            }
+            renderPerfil(document.getElementById('section-body'), true);
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+async function publicar() {
+    const txt = document.getElementById('p-txt').value;
+    const img = document.getElementById('p-prev');
+    if(!txt && img.classList.contains('hidden')) return;
+
+    const post = { id: Date.now(), d: txt, i: img.classList.contains('hidden') ? null : img.src };
+    uActivo.posts.unshift(post);
+    await _supabase.from('Perfiles').update({ posts: uActivo.posts }).eq('id', uActivo.id);
+    alert("¡Posteado!");
+    navegar('panel', document.querySelector('.nav-item'));
+}
+
+function previewP(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const p = document.getElementById('p-prev');
+            p.src = e.target.result; p.classList.remove('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+window.onload = () => lucide.createIcons();
+              
  
 
     </script>
