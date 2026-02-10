@@ -88,137 +88,146 @@
 
     <script>
         // CONFIGURACIÓN SUPABASE
-        const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
-        const SB_KEY = 'sb_publishable_rQfM6eBNu4ZnzIQBVDYpJg_3Xq0PKoV';
-        const _supabase = supabase.createClient(SB_URL, SB_KEY);
+const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
+const SB_KEY = 'sb_publishable_rQfM6eBNu4ZnzIQBVDYpJg_3Xq0PKoV';
+const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
-        let uActivo = null;
+let uActivo = null;
 
-        // --- SISTEMA NUBE ---
+// --- SISTEMA NUBE ---
 
-        async function iniciarSesion() {
-            const e = document.getElementById('login-email').value.toLowerCase();
-            const p = document.getElementById('login-pass').value;
+async function iniciarSesion() {
+    const e = document.getElementById('login-email').value.toLowerCase();
+    const p = document.getElementById('login-pass').value;
 
-            const { data, error } = await _supabase
-                .from('Perfiles')
-                .select('*')
-                .eq('email', e)
-                .single();
+    const { data, error } = await _supabase
+        .from('Perfiles')
+        .select('*')
+        .eq('email', e)
+        .single();
 
-            if (data && data.pass === p) {
-                uActivo = data;
-                // Convertir campos JSON que vienen como texto desde Supabase si es necesario
-                uActivo.tienda = typeof data.tienda === 'string' ? JSON.parse(data.tienda) : data.tienda;
-                uActivo.prods = typeof data.prods === 'string' ? JSON.parse(data.prods) : data.prods || [];
-                uActivo.posts = typeof data.posts === 'string' ? JSON.parse(data.posts) : data.posts || [];
+    if (data && data.pass === p) {
+        uActivo = data;
+        uActivo.prods = typeof data.prods === 'string' ? JSON.parse(data.prods) : data.prods || [];
+        uActivo.posts = typeof data.posts === 'string' ? JSON.parse(data.posts) : data.posts || [];
+        
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-content').classList.remove('hidden');
+        document.getElementById('nav-bar').classList.remove('hidden');
+        
+        // IR AL MURO AUTOMÁTICAMENTE
+        navegar('panel', document.querySelector('.nav-item'));
+    } else {
+        alert("Gmail o contraseña incorrectos.");
+    }
+}
 
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('main-content').classList.remove('hidden');
-                document.getElementById('nav-bar').classList.remove('hidden');
-                navegar('panel', document.querySelector('.nav-item'));
-            } else {
-                alert("Gmail o contraseña incorrectos.");
-            }
-        }
+async function registrarUsuario() {
+    const n = document.getElementById('reg-name').value;
+    const e = document.getElementById('reg-email').value.toLowerCase();
+    const p = document.getElementById('reg-pass').value;
+    const f = document.getElementById('preview-user-pic').src;
 
-        async function registrarUsuario() {
-            const n = document.getElementById('reg-name').value;
-            const e = document.getElementById('reg-email').value.toLowerCase();
-            const p = document.getElementById('reg-pass').value;
-            const f = document.getElementById('preview-user-pic').src;
+    if(!e || !n || !p) return alert("Completa todo");
 
-            if(!e || !n || !p) return alert("Completa todo");
+    const { error } = await _supabase
+        .from('Perfiles')
+        .insert([{ nombre: n, email: e, pass: p, foto: f, prods: [], posts: [] }]);
 
-            const { error } = await _supabase
-                .from('Perfiles')
-                .insert([{ 
-                    nombre: n, 
-                    email: e, 
-                    pass: p, 
-                    foto: f, 
-                    tienda: null, 
-                    prods: [], 
-                    posts: [] 
-                }]);
+    if(!error) {
+        alert("¡Cuenta creada!");
+        toggleAuth('login');
+    } else {
+        alert("Error: " + error.message);
+    }
+}
 
-            if(!error) {
-                alert("Cuenta creada en la nube");
-                toggleAuth('login');
-            } else {
-                alert("Error: " + error.message);
-            }
-        }
+// --- FUNCIÓN DE NAVEGACIÓN CORREGIDA ---
+function navegar(sec, el) {
+    // 1. Limpiar todos los iconos
+    document.querySelectorAll('.nav-item').forEach(i => {
+        i.classList.add('grayscale', 'opacity-40');
+        i.classList.remove('active-icon');
+    });
 
-        async function saveCloud() {
-            const { error } = await _supabase
-                .from('Perfiles')
-                .update({ 
-                    tienda: uActivo.tienda, 
-                    prods: uActivo.prods, 
-                    posts: uActivo.posts 
-                })
-                .eq('id', uActivo.id);
-            
-            if(error) console.log("Error al guardar:", error);
-        }
+    // 2. Resaltar el icono seleccionado
+    el.classList.remove('grayscale', 'opacity-40');
+    el.classList.add('active-icon');
+    
+    const body = document.getElementById('section-body');
+    const tit = document.getElementById('section-title');
 
-        // --- LAS FUNCIONES DE TU DISEÑO AHORA USAN saveCloud() ---
+    // 3. Cambiar el contenido de la pantalla
+    if(sec === 'panel') {
+        tit.innerHTML = '<img src="barra logo.png" class="h-8">';
+        cargarMuro(body);
+    } 
+    else if(sec === 'menu') {
+        tit.innerHTML = '<span class="font-black italic text-red-600">MI PERFIL</span>';
+        body.innerHTML = `
+            <div class="glass p-6 rounded-3xl mb-4 flex items-center gap-4">
+                <img src="${uActivo.foto}" class="w-12 h-12 rounded-full border border-red-600 object-cover">
+                <p class="font-black italic uppercase">${uActivo.nombre}</p>
+            </div>
+            <button onclick="location.reload()" class="w-full bg-red-600/10 p-4 rounded-2xl font-black text-red-600 text-[9px] uppercase">Cerrar Sesión</button>
+        `;
+    } 
+    else if(sec === 'buscador') {
+        tit.innerHTML = '<span class="font-black italic text-white uppercase">Buscador</span>';
+        body.innerHTML = '<p class="text-center py-20 opacity-20 italic">Próximamente...</p>';
+    }
+    else if(sec === 'canastilla') {
+        tit.innerHTML = '<span class="font-black italic text-white uppercase">Canastilla</span>';
+        body.innerHTML = '<p class="text-center py-20 opacity-20 italic">Carrito vacío</p>';
+    }
+    
+    lucide.createIcons();
+}
 
-        function finalizarTienda() {
-            const n = document.getElementById('conf-name').value;
-            const l = document.getElementById('conf-logo-prev').src;
-            const b = document.getElementById('conf-banner-prev').src;
-            if(!n) return alert("Ponle nombre");
-            uActivo.tienda = { name: n, logo: l, banner: b };
-            saveCloud(); 
-            document.getElementById('modal-config').classList.add('hidden'); 
-            verTienda();
-        }
+async function cargarMuro(container) {
+    const { data } = await _supabase.from('Perfiles').select('nombre, foto, posts');
+    let html = '';
+    if(data) {
+        data.forEach(user => {
+            const posts = typeof user.posts === 'string' ? JSON.parse(user.posts) : user.posts || [];
+            posts.forEach(p => {
+                html += `
+                    <div class="feed-card">
+                        <div class="p-4 flex items-center gap-2">
+                            <img src="${user.foto}" class="w-6 h-6 rounded-full object-cover">
+                            <span class="text-[9px] font-black italic uppercase">${user.nombre}</span>
+                        </div>
+                        <img src="${p.i}" class="w-full aspect-square object-cover">
+                        <div class="p-4"><p class="text-[10px] font-bold italic">${p.d}</p></div>
+                    </div>`;
+            });
+        });
+    }
+    container.innerHTML = html || '<p class="text-center py-20 opacity-20 italic">Muro vacío</p>';
+    lucide.createIcons();
+}
 
-        function guardarItem(tipo) {
-            const n = document.getElementById(tipo === 'articulo' ? 'art-name' : 'ser-name').value;
-            const p = tipo === 'articulo' ? document.getElementById('art-price').value : null;
-            const i = document.getElementById(tipo === 'articulo' ? 'art-img-preview' : 'ser-img-preview').src;
-            
-            uActivo.prods.push({ n, p, i, tipo });
-            saveCloud(); 
-            cerrarSubSeccion(`modal-${tipo}`); 
-            renderTiendaContenido('tienda');
-        }
+async function previewImage(input, targetId, labelId) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = document.getElementById(targetId);
+            img.src = e.target.result;
+            img.classList.remove('hidden');
+            if(labelId) document.getElementById(labelId).classList.add('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
 
-        function guardarPost() {
-            const d = document.getElementById('post-desc').value;
-            const i = document.getElementById('post-img-preview').src;
-            uActivo.posts.push({ id: Date.now(), d, i, likes: 0, likedBy: [], comments: [], shares: 0 });
-            saveCloud(); 
-            cerrarSubSeccion('modal-post'); 
-            renderTiendaContenido('inicio');
-        }
+function toggleAuth(t) {
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('register-screen').classList.add('hidden');
+    document.getElementById(t + '-screen').classList.remove('hidden');
+}
 
-        // ... [El resto de tus funciones navegar(), renderFeed(), etc., se quedan igual] ...
+window.onload = () => lucide.createIcons();
 
-        async function previewImage(input, targetId, labelId) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = document.getElementById(targetId);
-                    img.src = e.target.result;
-                    img.classList.remove('hidden');
-                    if(labelId) document.getElementById(labelId).classList.add('hidden');
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        function toggleAuth(t) {
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('register-screen').classList.add('hidden');
-            document.getElementById(t + '-screen').classList.remove('hidden');
-            lucide.createIcons();
-        }
-
-        window.onload = () => lucide.createIcons();
     </script>
 </body>
 </html>
