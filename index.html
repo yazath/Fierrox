@@ -87,8 +87,7 @@
     </nav>
 
     <script>
-     
-const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
+    const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
 const SB_KEY = 'sb_publishable_rQfM6eBNu4ZnzIQBVDYpJg_3Xq0PKoV';
 const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
@@ -101,8 +100,14 @@ window.onload = async () => {
     const sesionGuardada = localStorage.getItem('sesion_fierrox');
     if (sesionGuardada) {
         uActivo = JSON.parse(sesionGuardada);
+        // Sincronizar datos frescos de la nube al iniciar
         const { data } = await _supabase.from('Perfiles').select('*').eq('id', uActivo.id).single();
-        if(data) { uActivo = data; parseUserData(uActivo); entrarApp(); }
+        if(data) {
+            uActivo = data;
+            parseUserData(uActivo);
+            localStorage.setItem('sesion_fierrox', JSON.stringify(uActivo)); // Actualizar local
+            entrarApp();
+        }
     }
     lucide.createIcons();
 };
@@ -112,7 +117,8 @@ async function iniciarSesion() {
     const p = document.getElementById('login-pass').value;
     const { data } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
     if (data && data.pass === p) {
-        uActivo = data; parseUserData(uActivo);
+        uActivo = data; 
+        parseUserData(uActivo);
         localStorage.setItem('sesion_fierrox', JSON.stringify(uActivo));
         entrarApp();
     } else { alert("Datos incorrectos"); }
@@ -137,38 +143,47 @@ function navegar(sec, el) {
     if(el) el.classList.remove('grayscale', 'opacity-40');
     const body = document.getElementById('section-body');
     const tit = document.getElementById('section-title');
+    
+    // Limpiar estado de perfil viendo al navegar al muro
+    if(sec === 'panel') perfilViendo = null;
+
     tit.innerHTML = (sec === 'panel') ? '<img src="barra logo.png" class="h-8">' : '';
     if(sec === 'panel') cargarFeedGlobal(body);
     else if(sec === 'menu') { perfilViendo = uActivo; renderPerfil(body, true); }
     lucide.createIcons();
 }
 
-// --- RENDERIZADO DE POSTS (REUTILIZABLE) ---
-function crearHTMLPost(p, uData) {
-    const liked = p.likes?.includes(uActivo.id);
-    return `
-    <div class="feed-card mb-6 bg-zinc-900/40 rounded-[2.5rem] overflow-hidden border border-white/5">
-        <div class="p-5 flex items-center gap-3">
-            <img onclick="verPerfilPublico(${uData.id})" src="${uData.foto}" class="w-10 h-10 rounded-full object-cover border border-white/10 cursor-pointer">
-            <span onclick="verPerfilPublico(${uData.id})" class="text-[11px] font-black italic uppercase cursor-pointer">${uData.nombre}</span>
-        </div>
-        ${p.i ? `<img src="${p.i}" class="w-full object-cover max-h-[450px]">` : ''}
-        <div class="p-5">
-            <p class="text-[12px] font-medium text-gray-200 mb-5">${p.d}</p>
-            <div class="flex justify-between border-t border-white/5 pt-4">
-                <button onclick="darLike(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black ${liked ? 'text-red-600' : 'text-gray-400'}">
-                    <i data-lucide="heart" class="w-5 ${liked ? 'fill-red-600' : ''}"></i> ${p.likes?.length || 0}
-                </button>
-                <button onclick="abrirComentarios(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black text-gray-400">
-                    <i data-lucide="message-circle" class="w-5"></i> ${p.comentarios?.length || 0}
-                </button>
-                <button onclick="compartir(${p.id})" class="flex items-center gap-2 text-[10px] font-black text-gray-400"><i data-lucide="share-2" class="w-5"></i></button>
-            </div>
-        </div>
-    </div>`;
+// --- LÓGICA DE SEGUIDORES (CORREGIDA) ---
+async function toggleSeguir() {
+    if (!uActivo || !perfilViendo) return;
+
+    let listaSeguidores = [...perfilViendo.seguidores];
+    const miId = uActivo.id;
+
+    if (listaSeguidores.includes(miId)) {
+        // Dejar de seguir
+        listaSeguidores = listaSeguidores.filter(id => id !== miId);
+    } else {
+        // Seguir
+        listaSeguidores.push(miId);
+    }
+
+    // Actualizar en la base de datos del usuario al que estamos viendo
+    const { error } = await _supabase
+        .from('Perfiles')
+        .update({ seguidores: listaSeguidores })
+        .eq('id', perfilViendo.id);
+
+    if (!error) {
+        perfilViendo.seguidores = listaSeguidores;
+        // Refrescar la vista del perfil para ver el cambio de botón y contador
+        renderPerfil(document.getElementById('section-body'), false);
+    } else {
+        alert("Error al actualizar seguidores");
+    }
 }
 
-// --- LÓGICA DE PERFIL ---
+// --- RENDERIZADO DE PERFIL ---
 function renderPerfil(container, esMio) {
     const bannerImg = perfilViendo.tienda?.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1000&auto=format&fit=crop';
     const siguiendo = perfilViendo.seguidores.includes(uActivo.id);
@@ -202,13 +217,13 @@ function renderPerfil(container, esMio) {
 
         <div class="text-center mb-6">
             <h2 class="text-2xl font-black italic uppercase text-white">${perfilViendo.nombre}</h2>
-            <p class="text-[11px] font-black text-red-600 uppercase mt-2">${perfilViendo.seguidores.length} SEGUIDORES</p>
-            ${!esMio ? `<button onclick="toggleSeguir()" class="mt-4 ${siguiendo ? 'bg-zinc-800 text-white' : 'bg-white text-black'} px-10 py-3 rounded-full font-black text-[11px] italic uppercase transition-all">
+            <p class="text-[11px] font-black text-red-600 uppercase mt-2 tracking-widest">${perfilViendo.seguidores.length} SEGUIDORES</p>
+            ${!esMio ? `<button onclick="toggleSeguir()" class="mt-4 ${siguiendo ? 'bg-zinc-800 text-white border border-white/20' : 'bg-white text-black'} px-10 py-3 rounded-full font-black text-[11px] italic uppercase transition-all shadow-xl">
                 ${siguiendo ? 'SIGUIENDO' : 'SEGUIR'}
             </button>` : ''}
         </div>
 
-        <div id="perfil-posts-cont" class="px-2"></div>
+        <div id="perfil-posts-cont" class="px-2 pb-20"></div>
     `;
     
     const pCont = document.getElementById('perfil-posts-cont');
@@ -220,38 +235,30 @@ function renderPerfil(container, esMio) {
     lucide.createIcons();
 }
 
-// --- FUNCIONES DE ACCIÓN ---
-async function subirImg(input, tipo) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const base = e.target.result;
-            if(tipo === 'foto') { uActivo.foto = base; await _supabase.from('Perfiles').update({ foto: base }).eq('id', uActivo.id); }
-            else { uActivo.tienda.banner = base; await _supabase.from('Perfiles').update({ tienda: uActivo.tienda }).eq('id', uActivo.id); }
-            renderPerfil(document.getElementById('section-body'), true);
-        };
-        reader.readAsDataURL(input.files[0]);
-    }
-}
+// --- RESTO DE FUNCIONES (MANTENIENDO CALIDAD) ---
 
-async function toggleSeguir() {
-    let list = perfilViendo.seguidores;
-    if(list.includes(uActivo.id)) list = list.filter(id => id !== uActivo.id);
-    else list.push(uActivo.id);
-    await _supabase.from('Perfiles').update({ seguidores: list }).eq('id', perfilViendo.id);
-    perfilViendo.seguidores = list;
-    renderPerfil(document.getElementById('section-body'), false);
-}
-
-function toggleMenuOptions() { document.getElementById('drop-menu').classList.toggle('hidden'); }
-
-async function verListaSeguidores() {
-    let nombres = "";
-    for(let id of uActivo.seguidores) {
-        const { data } = await _supabase.from('Perfiles').select('nombre').eq('id', id).single();
-        if(data) nombres += "• " + data.nombre + "\n";
-    }
-    alert("TE SIGUEN:\n" + (nombres || "Aún no tienes seguidores"));
+function crearHTMLPost(p, uData) {
+    const liked = p.likes?.includes(uActivo.id);
+    return `
+    <div class="feed-card mb-6 bg-zinc-900/40 rounded-[2.5rem] overflow-hidden border border-white/5 shadow-lg">
+        <div class="p-5 flex items-center gap-3">
+            <img onclick="verPerfilPublico(${uData.id})" src="${uData.foto}" class="w-10 h-10 rounded-full object-cover border border-white/10 cursor-pointer">
+            <span onclick="verPerfilPublico(${uData.id})" class="text-[11px] font-black italic uppercase cursor-pointer">${uData.nombre}</span>
+        </div>
+        ${p.i ? `<img src="${p.i}" class="w-full object-cover max-h-[450px]">` : ''}
+        <div class="p-5">
+            <p class="text-[12px] font-medium text-gray-200 mb-5">${p.d}</p>
+            <div class="flex justify-between border-t border-white/5 pt-4">
+                <button onclick="darLike(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black ${liked ? 'text-red-600' : 'text-gray-400'}">
+                    <i data-lucide="heart" class="w-5 ${liked ? 'fill-red-600' : ''}"></i> ${p.likes?.length || 0}
+                </button>
+                <button onclick="abrirComentarios(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black text-gray-400">
+                    <i data-lucide="message-circle" class="w-5"></i> ${p.comentarios?.length || 0}
+                </button>
+                <button onclick="compartir(${p.id})" class="flex items-center gap-2 text-[10px] font-black text-gray-400"><i data-lucide="share-2" class="w-5"></i></button>
+            </div>
+        </div>
+    </div>`;
 }
 
 async function cargarFeedGlobal(container) {
@@ -271,6 +278,34 @@ async function verPerfilPublico(id) {
     if(data) { perfilViendo = data; parseUserData(perfilViendo); renderPerfil(document.getElementById('section-body'), false); }
 }
 
+function toggleMenuOptions() { 
+    const menu = document.getElementById('drop-menu');
+    menu.classList.toggle('hidden');
+}
+
+async function verListaSeguidores() {
+    if (uActivo.seguidores.length === 0) return alert("Aún no tienes seguidores");
+    let nombres = "TE SIGUEN:\n";
+    const { data } = await _supabase.from('Perfiles').select('nombre').in('id', uActivo.seguidores);
+    if(data) {
+        data.forEach(u => nombres += "• " + u.nombre + "\n");
+        alert(nombres);
+    }
+}
+
+async function subirImg(input, tipo) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base = e.target.result;
+            if(tipo === 'foto') { uActivo.foto = base; await _supabase.from('Perfiles').update({ foto: base }).eq('id', uActivo.id); }
+            else { uActivo.tienda.banner = base; await _supabase.from('Perfiles').update({ tienda: uActivo.tienda }).eq('id', uActivo.id); }
+            renderPerfil(document.getElementById('section-body'), true);
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
 async function darLike(userId, postId) {
     const { data } = await _supabase.from('Perfiles').select('posts').eq('id', userId).single();
     let posts = typeof data.posts === 'string' ? JSON.parse(data.posts) : data.posts;
@@ -283,15 +318,17 @@ async function darLike(userId, postId) {
         return p;
     });
     await _supabase.from('Perfiles').update({ posts }).eq('id', userId);
-    // Refrescar donde estemos
-    if(perfilViendo) renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
-    else navegar('panel');
+    if(perfilViendo) {
+        // Si estamos en un perfil, recargamos el perfil viendo para actualizar el like
+        const { data: dNew } = await _supabase.from('Perfiles').select('*').eq('id', perfilViendo.id).single();
+        perfilViendo = dNew; parseUserData(perfilViendo);
+        renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
+    } else { navegar('panel'); }
 }
 
 function cerrarSesion() { localStorage.removeItem('sesion_fierrox'); location.reload(); }
 function compartir() { alert("¡Enlace copiado!"); }
 
-// (Mantener funciones de abrirComentarios y enviarComentario del paso anterior aquí abajo...)
 async function abrirComentarios(userId, postId) {
     postActualComentando = { userId, postId };
     const modal = document.createElement('div');
@@ -339,11 +376,14 @@ async function enviarComentario() {
     });
     await _supabase.from('Perfiles').update({ posts }).eq('id', userId);
     document.getElementById('modal-comentarios').remove();
-    if(perfilViendo) renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
-    else navegar('panel');
+    if(perfilViendo) {
+        const { data: dNew } = await _supabase.from('Perfiles').select('*').eq('id', perfilViendo.id).single();
+        perfilViendo = dNew; parseUserData(perfilViendo);
+        renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
+    } else { navegar('panel'); }
 }
-
  
+                        
 
     </script>
 </body>
