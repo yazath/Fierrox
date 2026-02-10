@@ -87,13 +87,14 @@
     </nav>
 
     <script>
-        // CONFIGURACIÓN SUPABASE
+       // CONFIGURACIÓN SUPABASE
 const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
 const SB_KEY = 'sb_publishable_rQfM6eBNu4ZnzIQBVDYpJg_3Xq0PKoV';
 const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
 let uActivo = null;
 
+// --- INICIO DE SESIÓN ---
 async function iniciarSesion() {
     const e = document.getElementById('login-email').value.toLowerCase();
     const p = document.getElementById('login-pass').value;
@@ -108,6 +109,7 @@ async function iniciarSesion() {
         uActivo = data;
         uActivo.prods = typeof data.prods === 'string' ? JSON.parse(data.prods) : data.prods || [];
         uActivo.posts = typeof data.posts === 'string' ? JSON.parse(data.posts) : data.posts || [];
+        uActivo.tienda = typeof data.tienda === 'string' ? JSON.parse(data.tienda) : data.tienda || {};
         
         document.getElementById('login-screen').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
@@ -115,17 +117,16 @@ async function iniciarSesion() {
         
         navegar('panel', document.querySelector('.nav-item'));
     } else {
-        alert("Gmail o contraseña incorrectos.");
+        alert("Credenciales incorrectas.");
     }
 }
 
-// --- FUNCIÓN DE NAVEGACIÓN ---
+// --- NAVEGACIÓN ---
 function navegar(sec, el) {
     document.querySelectorAll('.nav-item').forEach(i => {
         i.classList.add('grayscale', 'opacity-40');
         i.classList.remove('active-icon');
     });
-
     el.classList.remove('grayscale', 'opacity-40');
     el.classList.add('active-icon');
     
@@ -141,93 +142,150 @@ function navegar(sec, el) {
         renderMiPerfil(body);
     } 
     else {
-        body.innerHTML = '<p class="text-center py-20 opacity-20 italic">Próximamente...</p>';
+        body.innerHTML = '<p class="text-center py-20 opacity-20 italic font-black">Próximamente...</p>';
     }
     lucide.createIcons();
 }
 
-// --- NUEVA FUNCIÓN: RENDERIZAR PERFIL CON CAMBIO DE FOTO ---
+// --- DISEÑO TIPO FACEBOOK ---
 function renderMiPerfil(container) {
     container.innerHTML = `
-        <div class="glass p-6 rounded-3xl mb-4 flex flex-col items-center gap-4 text-center">
-            <div class="relative group">
-                <img id="mi-foto-perfil" src="${uActivo.foto}" class="w-24 h-24 rounded-full border-2 border-red-600 object-cover shadow-lg shadow-red-600/20">
-                <label class="absolute bottom-0 right-0 bg-red-600 p-2 rounded-full cursor-pointer border-2 border-black">
-                    <i data-lucide="camera" class="w-4 h-4 text-white"></i>
-                    <input type="file" accept="image/*" class="hidden" onchange="actualizarFotoPerfil(this)">
+        <div class="relative mb-20">
+            <div class="w-full h-40 bg-zinc-900 rounded-b-[2rem] overflow-hidden relative border-b border-white/10">
+                <img id="view-banner" src="${uActivo.tienda?.banner || 'https://via.placeholder.com/600x200?text=Banner'}" class="w-full h-full object-cover">
+                <label class="absolute bottom-2 right-4 bg-black/60 p-2 rounded-xl cursor-pointer backdrop-blur-md">
+                    <i data-lucide="camera" class="w-4 h-4"></i>
+                    <input type="file" class="hidden" onchange="subirImagen(this, 'banner')">
                 </label>
             </div>
-            <div>
-                <p class="font-black italic uppercase text-lg">${uActivo.nombre}</p>
-                <p class="text-[10px] text-gray-400 font-bold uppercase italic">${uActivo.email}</p>
+            
+            <div class="absolute -bottom-16 left-1/2 -translate-x-1/2">
+                <div class="relative">
+                    <img id="view-perfil" src="${uActivo.foto}" class="w-32 h-32 rounded-full border-4 border-black object-cover shadow-2xl">
+                    <label class="absolute bottom-0 right-0 bg-red-600 p-2 rounded-full cursor-pointer border-2 border-black">
+                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                        <input type="file" class="hidden" onchange="subirImagen(this, 'foto')">
+                    </label>
+                </div>
             </div>
         </div>
-        
-        <button onclick="location.reload()" class="w-full bg-red-600/10 p-4 rounded-2xl font-black text-red-600 text-[9px] uppercase tracking-widest italic border border-red-600/20">
-            Cerrar Sesión
-        </button>
+
+        <div class="text-center px-6 mb-8">
+            <input type="text" id="edit-nombre" value="${uActivo.nombre}" 
+                class="bg-transparent text-xl font-black italic uppercase text-center w-full outline-none border-b border-transparent focus:border-red-600 mb-1"
+                onchange="actualizarNombre(this.value)">
+            <p class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">${uActivo.email}</p>
+        </div>
+
+        <div class="glass p-4 rounded-[2rem] mb-6">
+            <textarea id="nuevo-post-txt" placeholder="¿Qué estás pensando?" class="w-full bg-transparent text-xs font-bold p-2 outline-none italic uppercase h-20"></textarea>
+            <div class="flex justify-between items-center mt-2 border-t border-white/5 pt-3">
+                <label class="flex items-center gap-2 text-[9px] font-black cursor-pointer text-gray-400">
+                    <i data-lucide="image" class="w-4 h-4"></i> AGREGAR FOTO
+                    <input type="file" id="post-file" class="hidden" onchange="previewPostImg(this)">
+                </label>
+                <button onclick="guardarPublicacion()" class="bg-white text-black px-6 py-2 rounded-full font-black text-[10px] italic">PUBLICAR</button>
+            </div>
+            <img id="post-preview" class="hidden w-full h-32 object-cover rounded-xl mt-3">
+        </div>
+
+        <button onclick="location.reload()" class="w-full py-4 text-[9px] font-black text-gray-600 uppercase italic">Cerrar Sesión</button>
     `;
     lucide.createIcons();
 }
 
-// --- NUEVA FUNCIÓN: SUBIR FOTO A SUPABASE ---
-async function actualizarFotoPerfil(input) {
+// --- FUNCIONES DE CARGA Y ACTUALIZACIÓN ---
+
+async function subirImagen(input, tipo) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = async (e) => {
-            const nuevaFotoBase64 = e.target.result;
-            
-            // 1. Mostrar cambio visual inmediato
-            document.getElementById('mi-foto-perfil').src = nuevaFotoBase64;
-
-            // 2. Guardar en Supabase
-            const { error } = await _supabase
-                .from('Perfiles')
-                .update({ foto: nuevaFotoBase64 })
-                .eq('id', uActivo.id);
-
-            if (!error) {
-                uActivo.foto = nuevaFotoBase64;
-                console.log("Foto actualizada en la nube");
+            const base64 = e.target.result;
+            if(tipo === 'foto') {
+                uActivo.foto = base64;
+                document.getElementById('view-perfil').src = base64;
+                await _supabase.from('Perfiles').update({ foto: base64 }).eq('id', uActivo.id);
             } else {
-                alert("Error al guardar la foto: " + error.message);
+                uActivo.tienda.banner = base64;
+                document.getElementById('view-banner').src = base64;
+                await _supabase.from('Perfiles').update({ tienda: uActivo.tienda }).eq('id', uActivo.id);
             }
         };
         reader.readAsDataURL(input.files[0]);
     }
 }
 
+async function actualizarNombre(nuevoNombre) {
+    uActivo.nombre = nuevoNombre;
+    await _supabase.from('Perfiles').update({ nombre: nuevoNombre }).eq('id', uActivo.id);
+}
+
+function previewPostImg(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const prev = document.getElementById('post-preview');
+            prev.src = e.target.result;
+            prev.classList.remove('hidden');
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+async function guardarPublicacion() {
+    const texto = document.getElementById('nuevo-post-txt').value;
+    const imgElement = document.getElementById('post-preview');
+    
+    if(!texto && imgElement.classList.contains('hidden')) return alert("Escribe algo");
+
+    const nuevoPost = {
+        id: Date.now(),
+        d: texto,
+        i: imgElement.classList.contains('hidden') ? null : imgElement.src,
+        fecha: new Date().toISOString()
+    };
+
+    uActivo.posts.unshift(nuevoPost);
+    
+    const { error } = await _supabase
+        .from('Perfiles')
+        .update({ posts: uActivo.posts })
+        .eq('id', uActivo.id);
+
+    if(!error) {
+        alert("Publicado con éxito");
+        navegar('panel', document.querySelector('.nav-item'));
+    }
+}
+
 async function cargarMuro(container) {
     const { data } = await _supabase.from('Perfiles').select('nombre, foto, posts');
-    let html = '';
+    let totalPosts = [];
     if(data) {
-        data.forEach(user => {
-            const posts = typeof user.posts === 'string' ? JSON.parse(user.posts) : user.posts || [];
-            posts.forEach(p => {
-                html += `
-                    <div class="feed-card">
-                        <div class="p-4 flex items-center gap-2">
-                            <img src="${user.foto}" class="w-6 h-6 rounded-full object-cover">
-                            <span class="text-[9px] font-black italic uppercase">${user.nombre}</span>
-                        </div>
-                        <img src="${p.i}" class="w-full aspect-square object-cover">
-                        <div class="p-4"><p class="text-[10px] font-bold italic">${p.d}</p></div>
-                    </div>`;
-            });
+        data.forEach(u => {
+            const ps = typeof u.posts === 'string' ? JSON.parse(u.posts) : u.posts || [];
+            ps.forEach(p => totalPosts.push({ ...p, uNombre: u.nombre, uFoto: u.foto }));
         });
+        
+        // Ordenar por fecha (más recientes primero)
+        totalPosts.sort((a, b) => b.id - a.id);
+
+        container.innerHTML = totalPosts.map(p => `
+            <div class="feed-card">
+                <div class="p-4 flex items-center gap-2">
+                    <img src="${p.uFoto}" class="w-8 h-8 rounded-full object-cover border border-white/10">
+                    <span class="text-[10px] font-black italic uppercase">${p.uNombre}</span>
+                </div>
+                ${p.i ? `<img src="${p.i}" class="w-full object-cover max-h-96">` : ''}
+                <div class="p-4">
+                    <p class="text-[11px] font-medium italic text-gray-200">${p.d}</p>
+                </div>
+            </div>
+        `).join('') || '<p class="text-center py-20 opacity-20 italic">No hay publicaciones</p>';
     }
-    container.innerHTML = html || '<p class="text-center py-20 opacity-20 italic">Muro vacío</p>';
     lucide.createIcons();
 }
-
-function toggleAuth(t) {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('register-screen').classList.add('hidden');
-    document.getElementById(t + '-screen').classList.remove('hidden');
-}
-
-window.onload = () => lucide.createIcons();
-
+ 
 
     </script>
 </body>
