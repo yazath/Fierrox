@@ -94,8 +94,6 @@ const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
 let uActivo = null;
 
-// --- SISTEMA NUBE ---
-
 async function iniciarSesion() {
     const e = document.getElementById('login-email').value.toLowerCase();
     const p = document.getElementById('login-pass').value;
@@ -115,73 +113,88 @@ async function iniciarSesion() {
         document.getElementById('main-content').classList.remove('hidden');
         document.getElementById('nav-bar').classList.remove('hidden');
         
-        // IR AL MURO AUTOMÁTICAMENTE
         navegar('panel', document.querySelector('.nav-item'));
     } else {
         alert("Gmail o contraseña incorrectos.");
     }
 }
 
-async function registrarUsuario() {
-    const n = document.getElementById('reg-name').value;
-    const e = document.getElementById('reg-email').value.toLowerCase();
-    const p = document.getElementById('reg-pass').value;
-    const f = document.getElementById('preview-user-pic').src;
-
-    if(!e || !n || !p) return alert("Completa todo");
-
-    const { error } = await _supabase
-        .from('Perfiles')
-        .insert([{ nombre: n, email: e, pass: p, foto: f, prods: [], posts: [] }]);
-
-    if(!error) {
-        alert("¡Cuenta creada!");
-        toggleAuth('login');
-    } else {
-        alert("Error: " + error.message);
-    }
-}
-
-// --- FUNCIÓN DE NAVEGACIÓN CORREGIDA ---
+// --- FUNCIÓN DE NAVEGACIÓN ---
 function navegar(sec, el) {
-    // 1. Limpiar todos los iconos
     document.querySelectorAll('.nav-item').forEach(i => {
         i.classList.add('grayscale', 'opacity-40');
         i.classList.remove('active-icon');
     });
 
-    // 2. Resaltar el icono seleccionado
     el.classList.remove('grayscale', 'opacity-40');
     el.classList.add('active-icon');
     
     const body = document.getElementById('section-body');
     const tit = document.getElementById('section-title');
 
-    // 3. Cambiar el contenido de la pantalla
     if(sec === 'panel') {
         tit.innerHTML = '<img src="barra logo.png" class="h-8">';
         cargarMuro(body);
     } 
     else if(sec === 'menu') {
         tit.innerHTML = '<span class="font-black italic text-red-600">MI PERFIL</span>';
-        body.innerHTML = `
-            <div class="glass p-6 rounded-3xl mb-4 flex items-center gap-4">
-                <img src="${uActivo.foto}" class="w-12 h-12 rounded-full border border-red-600 object-cover">
-                <p class="font-black italic uppercase">${uActivo.nombre}</p>
-            </div>
-            <button onclick="location.reload()" class="w-full bg-red-600/10 p-4 rounded-2xl font-black text-red-600 text-[9px] uppercase">Cerrar Sesión</button>
-        `;
+        renderMiPerfil(body);
     } 
-    else if(sec === 'buscador') {
-        tit.innerHTML = '<span class="font-black italic text-white uppercase">Buscador</span>';
+    else {
         body.innerHTML = '<p class="text-center py-20 opacity-20 italic">Próximamente...</p>';
     }
-    else if(sec === 'canastilla') {
-        tit.innerHTML = '<span class="font-black italic text-white uppercase">Canastilla</span>';
-        body.innerHTML = '<p class="text-center py-20 opacity-20 italic">Carrito vacío</p>';
-    }
-    
     lucide.createIcons();
+}
+
+// --- NUEVA FUNCIÓN: RENDERIZAR PERFIL CON CAMBIO DE FOTO ---
+function renderMiPerfil(container) {
+    container.innerHTML = `
+        <div class="glass p-6 rounded-3xl mb-4 flex flex-col items-center gap-4 text-center">
+            <div class="relative group">
+                <img id="mi-foto-perfil" src="${uActivo.foto}" class="w-24 h-24 rounded-full border-2 border-red-600 object-cover shadow-lg shadow-red-600/20">
+                <label class="absolute bottom-0 right-0 bg-red-600 p-2 rounded-full cursor-pointer border-2 border-black">
+                    <i data-lucide="camera" class="w-4 h-4 text-white"></i>
+                    <input type="file" accept="image/*" class="hidden" onchange="actualizarFotoPerfil(this)">
+                </label>
+            </div>
+            <div>
+                <p class="font-black italic uppercase text-lg">${uActivo.nombre}</p>
+                <p class="text-[10px] text-gray-400 font-bold uppercase italic">${uActivo.email}</p>
+            </div>
+        </div>
+        
+        <button onclick="location.reload()" class="w-full bg-red-600/10 p-4 rounded-2xl font-black text-red-600 text-[9px] uppercase tracking-widest italic border border-red-600/20">
+            Cerrar Sesión
+        </button>
+    `;
+    lucide.createIcons();
+}
+
+// --- NUEVA FUNCIÓN: SUBIR FOTO A SUPABASE ---
+async function actualizarFotoPerfil(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const nuevaFotoBase64 = e.target.result;
+            
+            // 1. Mostrar cambio visual inmediato
+            document.getElementById('mi-foto-perfil').src = nuevaFotoBase64;
+
+            // 2. Guardar en Supabase
+            const { error } = await _supabase
+                .from('Perfiles')
+                .update({ foto: nuevaFotoBase64 })
+                .eq('id', uActivo.id);
+
+            if (!error) {
+                uActivo.foto = nuevaFotoBase64;
+                console.log("Foto actualizada en la nube");
+            } else {
+                alert("Error al guardar la foto: " + error.message);
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
 }
 
 async function cargarMuro(container) {
@@ -207,19 +220,6 @@ async function cargarMuro(container) {
     lucide.createIcons();
 }
 
-async function previewImage(input, targetId, labelId) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = document.getElementById(targetId);
-            img.src = e.target.result;
-            img.classList.remove('hidden');
-            if(labelId) document.getElementById(labelId).classList.add('hidden');
-        };
-        reader.readAsDataURL(input.files[0]);
-    }
-}
-
 function toggleAuth(t) {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('register-screen').classList.add('hidden');
@@ -227,6 +227,7 @@ function toggleAuth(t) {
 }
 
 window.onload = () => lucide.createIcons();
+
 
     </script>
 </body>
