@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FierroX Pro v1.9</title>
+    <title>FierroX Pro v2.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -20,6 +20,10 @@
         .nav-item { transition: 0.3s; opacity: 0.4; }
         .nav-item.active { opacity: 1; filter: drop-shadow(0 0 8px rgba(220,38,38,0.6)); }
         .star-active { fill: #facc15; color: #facc15; }
+        
+        /* Estilo para que el banner ocupe todo arriba */
+        .banner-container { width: 100%; height: 320px; position: relative; overflow: hidden; }
+        .banner-img { width: 100%; height: 100%; object-fit: cover; }
     </style>
 </head>
 <body>
@@ -29,7 +33,7 @@
         <div class="glass p-10 rounded-[3rem] w-full max-w-sm shadow-2xl border-white/5">
             <input type="email" id="login-email" placeholder="EMAIL" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-4 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
             <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-8 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
-            <button onclick="iniciarSesion()" class="w-full btn-premium text-white font-black py-5 rounded-2xl text-[11px] tracking-widest italic shadow-xl shadow-red-900/40">ACCEDER</button>
+            <button onclick="iniciarSesion()" class="w-full btn-premium text-white font-black py-5 rounded-2xl text-[11px] tracking-widest italic">ACCEDER</button>
         </div>
     </section>
 
@@ -57,32 +61,35 @@
         let tabActual = 'muro';
         let tempPostImg = null;
 
+        // INICIO
         window.onload = async () => {
             const sesion = localStorage.getItem('sesion_fierrox');
             if (sesion) {
                 uActivo = JSON.parse(sesion);
-                const { data } = await _supabase.from('Perfiles').select('*').eq('id', uActivo.id).single();
-                if(data) { uActivo = data; parseUserData(uActivo); entrarApp(); }
+                await actualizarDatosUsuario();
+                entrarApp();
             }
             lucide.createIcons();
         };
 
-        function parseUserData(user) {
-            user.posts = JSON.parse(user.posts || '[]');
-            user.tienda = JSON.parse(user.tienda || '{"activa":false,"catalogo":[],"valoracion":5}');
-            user.canastilla = JSON.parse(user.canastilla || '[]');
-            user.seguidores = JSON.parse(user.seguidores || '[]');
+        async function actualizarDatosUsuario() {
+            const { data } = await _supabase.from('Perfiles').select('*').eq('id', uActivo.id).single();
+            if(data) {
+                uActivo = data;
+                // Parseamos campos JSON si los usas para canastilla
+                uActivo.canastilla = typeof uActivo.canastilla === 'string' ? JSON.parse(uActivo.canastilla) : (uActivo.canastilla || []);
+            }
         }
 
         async function iniciarSesion() {
             const e = document.getElementById('login-email').value.toLowerCase().trim();
             const p = document.getElementById('login-pass').value;
-            const { data } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
+            const { data, error } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
             if (data && data.pass === p) {
-                uActivo = data; parseUserData(uActivo);
+                uActivo = data;
                 localStorage.setItem('sesion_fierrox', JSON.stringify(uActivo));
                 entrarApp();
-            } else { alert("Error de acceso"); }
+            } else { alert("Credenciales incorrectas"); }
         }
 
         function entrarApp() {
@@ -98,29 +105,69 @@
             if(el) el.classList.add('active');
             const body = document.getElementById('section-body');
             body.innerHTML = '';
+
             if(sec === 'panel') { perfilViendo = null; cargarFeedGlobal(body); }
             else if(sec === 'canastilla') { renderCanastilla(body); }
             else if(sec === 'menu') { perfilViendo = uActivo; renderPerfil(body, true); }
             lucide.createIcons();
         }
 
-        // --- RENDER PERFIL (SIN BARRA SUPERIOR) ---
-        function renderPerfil(container, esMio) {
-            const esTienda = perfilViendo.tienda?.activa;
-            const bannerImg = esTienda ? (perfilViendo.tienda.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400') : null;
+        // --- FEED GLOBAL (TABLA PUBLICACIONES) ---
+        async function cargarFeedGlobal(container) {
+            const { data, error } = await _supabase
+                .from('Publicaciones')
+                .select('*, Perfiles(nombre, foto, es_tienda, valoracion)')
+                .order('created_at', { ascending: false });
+
+            if(error) return;
+            container.innerHTML = data.map(post => crearHTMLPost(post, post.Perfiles)).join('');
+            lucide.createIcons();
+        }
+
+        function crearHTMLPost(p, uData) {
+            return `
+            <div class="mb-12 border-b border-white/5 pb-8">
+                <div class="flex items-center justify-between px-6 mb-4">
+                    <div class="flex items-center gap-3 cursor-pointer" onclick="verPerfilPublico(${p.autor_id})">
+                        <img src="${uData.foto}" class="w-10 h-10 rounded-full object-cover">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest">${uData.nombre}</p>
+                            <div class="flex">
+                                ${[1,2,3,4,5].map(s => `<i data-lucide="star" class="w-2 ${s <= uData.valoracion ? 'star-active' : 'text-zinc-800'}"></i>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ${p.imagen ? `<img src="${p.imagen}" class="w-full rounded-[2.5rem] shadow-2xl px-2">` : ''}
+                <div class="px-8 mt-6">
+                    <p class="text-[13px] text-zinc-300 leading-relaxed mb-6">${p.descripcion}</p>
+                    <div class="flex justify-between items-center text-zinc-500">
+                        <div class="flex gap-8">
+                            <button onclick="interaccion('like', ${p.id})"><i data-lucide="heart" class="w-6"></i></button>
+                            <button onclick="abrirComentarios(${p.id})"><i data-lucide="message-circle" class="w-6"></i></button>
+                            <button onclick="compartir(${p.id})"><i data-lucide="send" class="w-6"></i></button>
+                        </div>
+                        <button onclick="interaccion('save', ${p.id})"><i data-lucide="bookmark" class="w-6"></i></button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // --- PERFIL DE TIENDA (FULL BANNER) ---
+        async function renderPerfil(container, esMio) {
+            const esTienda = perfilViendo.es_tienda;
             
             container.innerHTML = `
                 <div class="relative mb-24">
-                    <div class="w-full h-80 relative bg-zinc-950 overflow-hidden">
-                        ${esTienda ? `<img src="${bannerImg}" class="w-full h-full object-cover">` : '<div class="w-full h-full bg-zinc-900"></div>'}
-                        <div class="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
+                    <div class="banner-container">
+                        <img src="${perfilViendo.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400'}" class="banner-img">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/20"></div>
                         
                         ${esMio ? `
                         <div class="absolute top-10 right-6 z-50">
                             <button onclick="toggleMenu()" class="glass p-4 rounded-3xl border-white/10"><i data-lucide="align-right"></i></button>
-                            <div id="drop-menu" class="hidden absolute right-0 mt-4 w-56 glass rounded-[2rem] overflow-hidden shadow-2xl z-50">
+                            <div id="drop-menu" class="hidden absolute right-0 mt-4 w-52 glass rounded-[2rem] overflow-hidden shadow-2xl">
                                 <button onclick="activarModoEdicion()" class="w-full p-5 text-[10px] font-black uppercase text-left border-b border-white/5">Editar Perfil</button>
-                                ${!esTienda ? `<button onclick="abrirModalTienda()" class="w-full p-5 text-[10px] font-black text-yellow-500 uppercase text-left border-b border-white/5">Activar Tienda</button>` : ''}
                                 <button onclick="cerrarSesion()" class="w-full p-5 text-[10px] font-black text-red-500 uppercase text-left">Cerrar Sesión</button>
                             </div>
                         </div>` : ''}
@@ -128,169 +175,115 @@
                         ${modoEdicion ? `
                         <label class="absolute inset-0 flex items-center justify-center bg-black/40 cursor-pointer">
                             <div class="bg-black/60 p-4 rounded-full border border-white/20"><i data-lucide="camera"></i></div>
-                            <input type="file" onchange="subirImagen(this, 'banner')">
+                            <input type="file" onchange="subirImagenLocal(this, 'banner')">
                         </label>` : ''}
                     </div>
                     
                     <div class="absolute -bottom-16 left-1/2 -translate-x-1/2">
                         <div class="relative">
-                            <img src="${perfilViendo.foto}" class="w-40 h-40 rounded-full border-8 border-black object-cover bg-zinc-800">
-                            ${modoEdicion ? `<label class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center cursor-pointer border-2 border-dashed border-white/20"><i data-lucide="camera"></i><input type="file" onchange="subirImagen(this, 'foto')"></label>` : ''}
+                            <img src="${perfilViendo.foto}" class="w-40 h-40 rounded-full border-8 border-black object-cover shadow-2xl">
+                            ${modoEdicion ? `<label class="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center cursor-pointer border-2 border-dashed border-white/20"><i data-lucide="camera"></i><input type="file" onchange="subirImagenLocal(this, 'foto')"></label>` : ''}
                         </div>
                     </div>
                 </div>
 
                 <div class="text-center px-8 mb-10">
-                    ${modoEdicion ? 
-                        `<input id="edit-nombre" type="text" value="${perfilViendo.nombre}" class="bg-white/5 border border-red-600 p-4 text-center text-xl font-black uppercase rounded-2xl w-full text-white">` :
-                        `<h2 class="text-3xl font-black italic uppercase text-white tracking-tighter">${perfilViendo.nombre}</h2>`
-                    }
+                    ${modoEdicion ? `<input id="edit-nombre" type="text" value="${perfilViendo.nombre}" class="bg-white/5 border border-red-600 p-4 text-center text-xl font-black uppercase rounded-2xl w-full text-white">` : `<h2 class="text-3xl font-black italic uppercase text-white tracking-tighter">${perfilViendo.nombre}</h2>`}
                     <div class="flex items-center justify-center gap-4 mt-3">
-                        <div class="flex items-center gap-1">
-                            ${[1,2,3,4,5].map(s => `<i data-lucide="star" class="w-3 ${s <= (perfilViendo.tienda.valoracion || 5) ? 'star-active' : 'text-zinc-700'}"></i>`).join('')}
-                        </div>
-                        <p class="text-[9px] font-black text-red-600 uppercase tracking-[0.2em]">${perfilViendo.seguidores.length} SEGUIDORES</p>
+                        <div class="flex">${[1,2,3,4,5].map(s => `<i data-lucide="star" class="w-3 ${s <= perfilViendo.valoracion ? 'star-active' : 'text-zinc-800'}"></i>`).join('')}</div>
+                        <p class="text-[9px] font-black text-red-600 uppercase tracking-widest">TIENDA VERIFICADA</p>
                     </div>
                 </div>
 
-                ${esTienda ? `
                 <div class="flex justify-around bg-zinc-900/50 mx-6 rounded-[2rem] p-1 border border-white/5 mb-10">
-                    <button onclick="setTab('muro')" class="flex-1 py-4 text-[9px] font-black uppercase rounded-[1.5rem] ${tabActual==='muro'?'bg-red-600 shadow-lg shadow-red-600/30 text-white':'text-zinc-500'}">Muro</button>
-                    <button onclick="setTab('catalogo')" class="flex-1 py-4 text-[9px] font-black uppercase rounded-[1.5rem] ${tabActual==='catalogo'?'bg-red-600 shadow-lg shadow-red-600/30 text-white':'text-zinc-500'}">Catálogo</button>
-                    <button onclick="setTab('reseñas')" class="flex-1 py-4 text-[9px] font-black uppercase rounded-[1.5rem] ${tabActual==='reseñas'?'bg-red-600 shadow-lg shadow-red-600/30 text-white':'text-zinc-500'}">Reseñas</button>
-                </div>` : ''}
+                    <button onclick="setTab('muro')" class="flex-1 py-4 text-[9px] font-black uppercase rounded-[1.5rem] ${tabActual==='muro'?'bg-red-600 text-white shadow-lg':'text-zinc-500'}">Muro</button>
+                    <button onclick="setTab('catalogo')" class="flex-1 py-4 text-[9px] font-black uppercase rounded-[1.5rem] ${tabActual==='catalogo'?'bg-red-600 text-white shadow-lg':'text-zinc-500'}">Catálogo</button>
+                </div>
 
                 <div id="contenido-perfil" class="px-4 pb-48"></div>
-                ${modoEdicion ? `<button onclick="finalizarEdicion()" class="fixed bottom-32 left-1/2 -translate-x-1/2 btn-premium text-white px-12 py-5 rounded-full font-black text-[11px] uppercase z-50 shadow-2xl">GUARDAR PERFIL</button>` : ''}
+                ${modoEdicion ? `<button onclick="finalizarEdicion()" class="fixed bottom-32 left-1/2 -translate-x-1/2 btn-premium text-white px-12 py-5 rounded-full font-black text-[11px] uppercase z-50">GUARDAR CAMBIOS</button>` : ''}
             `;
             renderContenidoTab(esMio);
             lucide.createIcons();
         }
 
-        // --- PUBLICACIONES ---
         function renderContenidoTab(esMio) {
             const cont = document.getElementById('contenido-perfil');
             if(tabActual === 'muro') {
-                if(esMio && perfilViendo.tienda?.activa) {
+                if(esMio) {
                     cont.innerHTML = `
-                    <div class="glass p-8 rounded-[3rem] mb-8 border-white/10">
+                    <div class="glass p-8 rounded-[3rem] mb-10 border-white/10">
                         <div class="flex justify-between mb-4">
-                             <span class="text-[9px] font-black text-zinc-500 uppercase">Nueva Publicación</span>
-                             <button onclick="cancelPost()" class="text-zinc-700"><i data-lucide="x" class="w-5"></i></button>
+                            <span class="text-[9px] font-black text-zinc-600 uppercase">¿Qué hay de nuevo?</span>
+                            <button onclick="cancelPost()" class="text-zinc-700"><i data-lucide="x" class="w-5"></i></button>
                         </div>
-                        <textarea id="p-txt" placeholder="ESCRIBE ALGO..." class="w-full bg-transparent text-[12px] font-bold p-2 outline-none uppercase h-16 text-white"></textarea>
-                        <div id="p-prev-box" class="hidden mb-4 relative rounded-3xl overflow-hidden"><img id="p-prev-img" class="w-full h-48 object-cover"></div>
+                        <textarea id="p-txt" placeholder="ESCRIBE AQUÍ..." class="w-full bg-transparent text-[14px] font-bold p-2 outline-none uppercase h-20 text-white"></textarea>
+                        <div id="p-prev-box" class="hidden mb-4 rounded-3xl overflow-hidden"><img id="p-prev-img" class="w-full h-48 object-cover"></div>
                         <div class="flex justify-between items-center mt-4 pt-6 border-t border-white/5">
-                            <label class="cursor-pointer text-zinc-500 flex items-center gap-2"><i data-lucide="image"></i><span class="text-[9px] font-black">FOTO</span><input type="file" onchange="previewPost(this)"></label>
-                            <button onclick="publicar()" class="btn-premium px-10 py-3 rounded-full font-black text-[9px]">LANZAR</button>
+                            <label class="cursor-pointer text-zinc-500 flex items-center gap-2"><i data-lucide="image"></i><span class="text-[9px] font-black">ADJUNTAR</span><input type="file" onchange="previewPostImg(this)"></label>
+                            <button onclick="publicarPost()" class="btn-premium px-10 py-3 rounded-full font-black text-[10px]">PUBLICAR</button>
                         </div>
                     </div>`;
                 }
-                perfilViendo.posts.forEach(p => cont.innerHTML += crearHTMLPost(p, perfilViendo));
-            } else if(tabActual === 'catalogo') {
-                cont.innerHTML = `${esMio ? `<button onclick="abrirModalItem()" class="w-full bg-white text-black p-5 rounded-[2rem] font-black text-[10px] uppercase mb-10">+ NUEVO ITEM</button>` : ''}
-                <div class="grid grid-cols-2 gap-4">
-                    ${perfilViendo.tienda.catalogo.map(item => `
-                        <div class="glass rounded-[2.5rem] overflow-hidden border-white/5 flex flex-col h-full relative">
-                            ${esMio ? `<button onclick="eliminarItem(${item.id})" class="absolute top-3 right-3 bg-black/50 p-2 rounded-full text-red-500 z-10"><i data-lucide="trash-2" class="w-4"></i></button>` : ''}
-                            <img src="${item.imgs[0]}" class="w-full h-36 object-cover">
-                            <div class="p-5 flex flex-col flex-1">
-                                <p class="text-[10px] font-black uppercase text-white mb-1">${item.nombre}</p>
-                                <p class="text-red-600 font-black text-xs mb-4">$${item.precio}</p>
-                                <button onclick='agregarCanastilla(${JSON.stringify(item)})' class="w-full bg-white text-black py-3 rounded-2xl text-[9px] font-black uppercase mt-auto">Añadir</button>
-                            </div>
-                        </div>`).join('')}
-                </div>`;
+                cargarMuroPerfil();
+            } else {
+                cargarCatalogoPerfil(esMio);
             }
+        }
+
+        // --- LÓGICA DE DATOS ---
+
+        async function publicarPost() {
+            const desc = document.getElementById('p-txt').value;
+            if(!desc && !tempPostImg) return;
+            const { error } = await _supabase.from('Publicaciones').insert([{ autor_id: uActivo.id, descripcion: desc, imagen: tempPostImg }]);
+            if(!error) { cancelPost(); renderPerfil(document.getElementById('section-body'), true); }
+        }
+
+        async function cargarMuroPerfil() {
+            const { data } = await _supabase.from('Publicaciones').select('*').eq('autor_id', perfilViendo.id).order('created_at', {ascending:false});
+            const cont = document.getElementById('contenido-perfil');
+            data.forEach(p => cont.innerHTML += crearHTMLPost(p, perfilViendo));
             lucide.createIcons();
         }
 
-        function crearHTMLPost(p, uData) {
-            const liked = p.likes?.includes(uActivo.id);
-            return `
-            <div class="mb-10 border-b border-white/5 pb-8">
-                <div class="flex items-center justify-between px-2 mb-4">
-                    <div class="flex items-center gap-3" onclick="verPerfilPublico(${uData.id})">
-                        <img src="${uData.foto}" class="w-10 h-10 rounded-full object-cover border border-white/10">
-                        <span class="text-[10px] font-black uppercase tracking-widest">${uData.nombre}</span>
+        async function cargarCatalogoPerfil(esMio) {
+            const { data } = await _supabase.from('Productos').select('*').eq('tienda_id', perfilViendo.id);
+            const cont = document.getElementById('contenido-perfil');
+            cont.innerHTML = esMio ? `<button onclick="abrirModalProducto()" class="w-full bg-white text-black p-5 rounded-[2rem] font-black text-[10px] uppercase mb-10">+ AGREGAR PRODUCTO</button>` : '';
+            cont.innerHTML += `<div class="grid grid-cols-2 gap-4">${data.map(prod => `
+                <div class="glass rounded-[2.5rem] overflow-hidden border-white/5 flex flex-col relative">
+                    ${esMio ? `<button onclick="eliminarProducto(${prod.id})" class="absolute top-3 right-3 bg-black/50 p-2 rounded-full text-red-500 z-10"><i data-lucide="trash-2" class="w-4"></i></button>` : ''}
+                    <img src="${prod.imagen}" class="w-full h-40 object-cover">
+                    <div class="p-5 flex-1 flex flex-col">
+                        <p class="text-[11px] font-black uppercase text-zinc-200 mb-1">${prod.nombre}</p>
+                        <p class="text-red-600 font-black text-sm mb-4">$${prod.precio}</p>
+                        <button onclick='agregarCanastilla(${JSON.stringify(prod)})' class="w-full bg-white text-black py-3 rounded-2xl text-[9px] font-black uppercase mt-auto">Añadir</button>
                     </div>
-                </div>
-                ${p.i ? `<img src="${p.i}" class="w-full rounded-[2.5rem] mb-6 shadow-2xl border border-white/5">` : ''}
-                <div class="px-4">
-                    <p class="text-[12px] text-zinc-300 mb-6 leading-relaxed">${p.d}</p>
-                    <div class="flex justify-between items-center text-zinc-500">
-                        <div class="flex gap-6">
-                            <button onclick="darLike(${uData.id}, ${p.id})" class="${liked?'text-red-600':''}"><i data-lucide="heart" class="w-6 ${liked?'fill-red-600':''}"></i></button>
-                            <button onclick="abrirComentarios(${p.id})"><i data-lucide="message-circle" class="w-6"></i></button>
-                            <button onclick="compartirPost(${p.id})"><i data-lucide="send" class="w-6"></i></button>
-                        </div>
-                        <button><i data-lucide="bookmark" class="w-6"></i></button>
-                    </div>
-                </div>
-            </div>`;
+                </div>`).join('')}</div>`;
+            lucide.createIcons();
         }
 
-        // --- FUNCIONALIDADES ---
-        async function publicar() {
-            const d = document.getElementById('p-txt').value;
-            if(!d && !tempPostImg) return;
-            const nuevo = { id: Date.now(), d, i: tempPostImg, likes: [], comentarios: [] };
-            uActivo.posts.unshift(nuevo);
-            await _supabase.from('Perfiles').update({ posts: JSON.stringify(uActivo.posts) }).eq('id', uActivo.id);
-            cancelPost();
-            renderPerfil(document.getElementById('section-body'), true);
-        }
-
-        function previewPost(input) {
-            if(input.files[0]) {
-                const r = new FileReader();
-                r.onload = e => {
-                    tempPostImg = e.target.result;
-                    document.getElementById('p-prev-img').src = tempPostImg;
-                    document.getElementById('p-prev-box').classList.remove('hidden');
-                };
-                r.readAsDataURL(input.files[0]);
-            }
-        }
-
-        function cancelPost() { tempPostImg = null; if(document.getElementById('p-txt')) document.getElementById('p-txt').value = ''; if(document.getElementById('p-prev-box')) document.getElementById('p-prev-box').classList.add('hidden'); }
-
-        async function darLike(uId, pId) {
-            const { data } = await _supabase.from('Perfiles').select('posts').eq('id', uId).single();
-            let ps = JSON.parse(data.posts);
-            ps = ps.map(p => {
-                if(p.id === pId) {
-                    p.likes = p.likes || [];
-                    if(p.likes.includes(uActivo.id)) p.likes = p.likes.filter(id => id !== uActivo.id);
-                    else p.likes.push(uActivo.id);
-                }
-                return p;
-            });
-            await _supabase.from('Perfiles').update({ posts: JSON.stringify(ps) }).eq('id', uId);
-            navegar(perfilViendo ? 'menu' : 'panel');
-        }
-
-        async function agregarCanastilla(item) {
-            uActivo.canastilla.push({...item, cartId: Date.now()});
-            const { error } = await _supabase.from('Perfiles').update({ canastilla: JSON.stringify(uActivo.canastilla) }).eq('id', uActivo.id);
-            if(!error) alert("AGREGADO A CANASTILLA");
+        async function agregarCanastilla(prod) {
+            uActivo.canastilla.push(prod);
+            await _supabase.from('Perfiles').update({ canastilla: JSON.stringify(uActivo.canastilla) }).eq('id', uActivo.id);
+            alert("AÑADIDO A TU CANASTILLA");
         }
 
         function renderCanastilla(container) {
-            container.innerHTML = `<div class="p-8 pt-16">
-                <h2 class="text-2xl font-black italic mb-10 text-center">CANASTILLA</h2>
-                ${uActivo.canastilla.length === 0 ? '<p class="text-center opacity-20 py-20 uppercase font-black">Vacía</p>' : 
+            container.innerHTML = `<div class="p-8 pt-20">
+                <h2 class="text-3xl font-black italic mb-10 text-center">MI CANASTILLA</h2>
+                ${uActivo.canastilla.length === 0 ? '<p class="text-center py-20 opacity-20 uppercase font-black">Está vacía</p>' : 
                 uActivo.canastilla.map((it, idx) => `
-                    <div class="glass p-5 rounded-[2rem] mb-4 flex gap-4 border-white/5">
-                        <img src="${it.imgs[0]}" class="w-16 h-16 rounded-2xl object-cover">
+                    <div class="glass p-5 rounded-[2.5rem] mb-4 flex gap-5 border-white/5">
+                        <img src="${it.imagen}" class="w-20 h-20 rounded-3xl object-cover shadow-xl">
                         <div class="flex-1">
-                            <p class="text-[10px] font-black uppercase">${it.nombre}</p>
-                            <p class="text-red-600 font-black text-xs">$${it.precio}</p>
-                            <button onclick="quitarCanastilla(${idx})" class="text-[8px] font-bold text-zinc-600 underline uppercase mt-1">Eliminar</button>
+                            <p class="text-[12px] font-black uppercase">${it.nombre}</p>
+                            <p class="text-red-600 font-black text-sm mt-1">$${it.precio}</p>
+                            <button onclick="quitarCanastilla(${idx})" class="text-[9px] font-bold text-zinc-600 underline uppercase mt-2">Quitar</button>
                         </div>
-                    </div>
-                `).join('')}
-                ${uActivo.canastilla.length > 0 ? '<button class="w-full btn-premium py-5 rounded-[2rem] font-black mt-10">PAGAR TOTAL</button>' : ''}
+                    </div>`).join('')}
+                ${uActivo.canastilla.length > 0 ? `<button class="w-full btn-premium py-6 rounded-[2.5rem] font-black text-sm mt-10 shadow-2xl shadow-red-900/40">FINALIZAR COMPRA</button>` : ''}
             </div>`;
         }
 
@@ -300,60 +293,84 @@
             renderCanastilla(document.getElementById('section-body'));
         }
 
-        // --- EDICIÓN ---
-        function activarModoEdicion() { modoEdicion = true; toggleMenu(); renderPerfil(document.getElementById('section-body'), true); }
-
-        async function finalizarEdicion() {
-            uActivo.nombre = document.getElementById('edit-nombre').value;
-            await _supabase.from('Perfiles').update({ 
-                nombre: uActivo.nombre, 
-                foto: uActivo.foto, 
-                tienda: JSON.stringify(uActivo.tienda) 
-            }).eq('id', uActivo.id);
-            modoEdicion = false;
-            renderPerfil(document.getElementById('section-body'), true);
-        }
-
-        async function subirImagen(input, tipo) {
+        // --- UTILIDADES ---
+        function previewPostImg(input) {
             if(input.files[0]) {
                 const r = new FileReader();
-                r.onload = async e => {
-                    if(tipo === 'foto') uActivo.foto = e.target.result;
-                    else uActivo.tienda.banner = e.target.result;
-                    renderPerfil(document.getElementById('section-body'), true);
-                };
+                r.onload = e => { tempPostImg = e.target.result; document.getElementById('p-prev-img').src = tempPostImg; document.getElementById('p-prev-box').classList.remove('hidden'); };
+                r.readAsDataURL(input.files[0]);
+            }
+        }
+        function cancelPost() { tempPostImg = null; if(document.getElementById('p-txt')) document.getElementById('p-txt').value = ''; if(document.getElementById('p-prev-box')) document.getElementById('p-prev-box').classList.add('hidden'); }
+        function toggleMenu() { document.getElementById('drop-menu').classList.toggle('hidden'); }
+        function setTab(t) { tabActual = t; renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id); }
+        function activarModoEdicion() { modoEdicion = true; toggleMenu(); renderPerfil(document.getElementById('section-body'), true); }
+        
+        async function finalizarEdicion() {
+            const nom = document.getElementById('edit-nombre').value;
+            const { error } = await _supabase.from('Perfiles').update({ nombre: nom, foto: uActivo.foto, banner: uActivo.banner }).eq('id', uActivo.id);
+            if(!error) { modoEdicion = false; await actualizarDatosUsuario(); renderPerfil(document.getElementById('section-body'), true); }
+        }
+
+        function subirImagenLocal(input, tipo) {
+            if(input.files[0]) {
+                const r = new FileReader();
+                r.onload = e => { if(tipo==='foto') uActivo.foto = e.target.result; else uActivo.banner = e.target.result; renderPerfil(document.getElementById('section-body'), true); };
                 r.readAsDataURL(input.files[0]);
             }
         }
 
-        async function cargarFeedGlobal(container) {
-            const { data } = await _supabase.from('Perfiles').select('*');
-            let feed = [];
-            data.forEach(u => {
-                const ps = JSON.parse(u.posts || '[]');
-                const t = JSON.parse(u.tienda || '{}');
-                if(t.activa) ps.forEach(p => feed.push({...p, uData: u}));
-            });
-            feed.sort((a,b) => b.id - a.id);
-            container.innerHTML = feed.length ? feed.map(p => crearHTMLPost(p, p.uData)).join('') : '<p class="text-center py-40 opacity-20 font-black uppercase">Sin actividad</p>';
+        async function verPerfilPublico(id) {
+            const { data } = await _supabase.from('Perfiles').select('*').eq('id', id).single();
+            perfilViendo = data;
+            tabActual = 'muro';
+            renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
+        }
+
+        function cerrarSesion() { localStorage.clear(); location.reload(); }
+
+        // MODAL PRODUCTO (X PARA CANCELAR)
+        function abrirModalProducto() {
+            const m = document.createElement('div');
+            m.className = "fixed inset-0 z-[1000] bg-black/95 flex items-end justify-center pb-12 px-6";
+            m.innerHTML = `
+            <div class="glass w-full max-w-sm p-10 rounded-[4rem] modal-in relative">
+                <button onclick="this.parentElement.parentElement.remove()" class="absolute top-8 right-8 text-zinc-600"><i data-lucide="x"></i></button>
+                <h3 class="text-white font-black text-center mb-10 text-sm italic uppercase tracking-widest">Nuevo Producto</h3>
+                <input id="m-nom" placeholder="NOMBRE" class="w-full bg-white/5 p-5 rounded-2xl text-white font-bold text-[11px] mb-4 outline-none border border-white/10">
+                <input id="m-pre" type="number" placeholder="PRECIO ($)" class="w-full bg-white/5 p-5 rounded-2xl text-white font-bold text-[11px] mb-8 outline-none border border-white/10">
+                <label class="w-full flex flex-col items-center justify-center bg-white/5 p-10 rounded-[2.5rem] border-2 border-dashed border-white/10 mb-10 cursor-pointer">
+                    <i data-lucide="image" class="text-zinc-500 mb-2"></i>
+                    <span class="text-[9px] font-black text-zinc-500 uppercase">Subir Foto</span>
+                    <input type="file" onchange="window.tempProdImgFile = this.files[0]">
+                </label>
+                <button onclick="guardarProducto(this)" class="w-full btn-premium py-5 rounded-3xl font-black text-[11px] uppercase italic">AÑADIR AL CATÁLOGO</button>
+            </div>`;
+            document.body.appendChild(m);
             lucide.createIcons();
         }
 
-        async function eliminarItem(id) {
-            if(!confirm("¿Eliminar?")) return;
-            uActivo.tienda.catalogo = uActivo.tienda.catalogo.filter(i => i.id !== id);
-            await _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id);
-            renderPerfil(document.getElementById('section-body'), true);
+        async function guardarProducto(btn) {
+            if(!window.tempProdImgFile) return alert("Sube una imagen");
+            btn.innerText = "SUBIENDO...";
+            const r = new FileReader();
+            r.onload = async e => {
+                const { error } = await _supabase.from('Productos').insert([{ 
+                    tienda_id: uActivo.id, 
+                    nombre: document.getElementById('m-nom').value, 
+                    precio: document.getElementById('m-pre').value, 
+                    imagen: e.target.result 
+                }]);
+                if(!error) { btn.parentElement.parentElement.remove(); renderPerfil(document.getElementById('section-body'), true); }
+            };
+            r.readAsDataURL(window.tempProdImgFile);
         }
 
-        function toggleMenu() { document.getElementById('drop-menu').classList.toggle('hidden'); }
-        function cerrarSesion() { localStorage.clear(); location.reload(); }
-        async function verPerfilPublico(id) {
-            const { data } = await _supabase.from('Perfiles').select('*').eq('id', id).single();
-            perfilViendo = data; parseUserData(perfilViendo);
-            renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
+        async function eliminarProducto(id) {
+            if(!confirm("¿Eliminar producto?")) return;
+            await _supabase.from('Productos').delete().eq('id', id);
+            renderPerfil(document.getElementById('section-body'), true);
         }
     </script>
 </body>
 </html>
-
