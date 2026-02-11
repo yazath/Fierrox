@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FierroX Pro v2.9</title>
+    <title>FierroX Pro v2.9.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -70,6 +70,7 @@
         let modoEdicion = false;
         let tempPostImg = null;
 
+        // --- INICIO ---
         window.onload = async () => {
             const sesion = localStorage.getItem('sesion_fierrox');
             if (sesion) { uActivo = JSON.parse(sesion); await actUser(); entrarApp(); }
@@ -88,11 +89,6 @@
             navegar('panel', document.querySelector('.nav-item'));
         }
 
-        function toggleMenu() {
-            document.getElementById('side-menu').classList.toggle('open');
-            document.getElementById('overlay').classList.toggle('hidden');
-        }
-
         async function iniciarSesion() {
             const e = document.getElementById('login-email').value.toLowerCase().trim();
             const p = document.getElementById('login-pass').value;
@@ -104,13 +100,17 @@
             } else { alert("Acceso denegado"); }
         }
 
+        function toggleMenu() {
+            document.getElementById('side-menu').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('hidden');
+        }
+
         function navegar(sec, el) {
             if(el) {
                 document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
                 el.classList.add('active');
             }
             if(document.getElementById('side-menu').classList.contains('open')) toggleMenu();
-            
             const body = document.getElementById('section-body');
             body.innerHTML = '';
             if(sec === 'panel') renderFeedMuro(body);
@@ -158,73 +158,91 @@
                             <button onclick="compartirPost(${p.id}, '${p.descripcion}')"><i data-lucide="send" class="w-6"></i></button>
                         </div>
                         <button onclick="guardarPost(${p.id}, this)">
-                            <i data-lucide="bookmark" class="w-6" style="${isS ? 'fill:white' : 'fill:none'}"></i>
+                            <i data-lucide="bookmark" class="w-6" style="${isS ? 'fill:white; color:white;' : 'fill:none;'}"></i>
                         </button>
                     </div>
                 </div>
             </div>`;
         }
 
-        // --- LÓGICA DE BOTONES ---
+        // --- REPARACIÓN DE INTERACCIONES ---
         async function darLike(pid, btn) {
             const h = btn.querySelector('i');
             const s = btn.querySelector('span');
+            let val = parseInt(s.innerText);
             if(h.classList.contains('active')) {
                 await _supabase.from('Interacciones').delete().eq('post_id', pid).eq('usuario_id', uActivo.id);
                 h.classList.remove('active');
-                s.innerText = Math.max(0, parseInt(s.innerText) - 1);
+                s.innerText = val - 1;
             } else {
                 await _supabase.from('Interacciones').insert([{post_id: pid, usuario_id: uActivo.id, tipo: 'like'}]);
                 h.classList.add('active');
-                s.innerText = parseInt(s.innerText) + 1;
+                s.innerText = val + 1;
             }
         }
 
         async function guardarPost(pid, btn) {
-            const icon = btn.querySelector('i');
+            const h = btn.querySelector('i');
             const { data } = await _supabase.from('Guardados').select('*').eq('post_id', pid).eq('usuario_id', uActivo.id).single();
             if(data) {
                 await _supabase.from('Guardados').delete().eq('post_id', pid).eq('usuario_id', uActivo.id);
-                icon.style.fill = "none";
+                h.style.fill = "none";
             } else {
                 await _supabase.from('Guardados').insert([{post_id: pid, usuario_id: uActivo.id}]);
-                icon.style.fill = "white";
+                h.style.fill = "white";
+                h.style.color = "white";
             }
         }
 
-        // --- PERFIL ---
+        async function abrirComentarios(pid) {
+            const m = document.createElement('div');
+            m.className = "fixed inset-0 z-[3000] bg-black flex flex-col";
+            m.innerHTML = `
+                <div class="p-6 border-b border-white/10 flex items-center gap-4">
+                    <button onclick="this.parentElement.parentElement.remove()"><i data-lucide="arrow-left"></i></button>
+                    <p class="font-black text-xs uppercase">Comentarios</p>
+                </div>
+                <div id="list-coms-box" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
+                <div class="p-6 glass border-t border-white/10 flex gap-4">
+                    <input id="txt-com" placeholder="ESCRIBE ALGO..." class="flex-1 bg-white/5 p-4 rounded-2xl outline-none text-xs font-bold uppercase">
+                    <button onclick="enviarComentario(${pid})" class="btn-premium px-6 rounded-2xl font-black text-xs">OK</button>
+                </div>`;
+            document.body.appendChild(m);
+            lucide.createIcons();
+            const { data } = await _supabase.from('Comentarios').select('*, Perfiles(*)').eq('post_id', pid).order('id');
+            const box = document.getElementById('list-coms-box');
+            if(data) data.forEach(c => {
+                box.innerHTML += `<div class="flex gap-3"><img src="${c.Perfiles.foto}" class="w-8 h-8 rounded-full"><div class="bg-white/5 p-3 rounded-2xl"><p class="text-[9px] font-black text-red-500 uppercase">${c.Perfiles.nombre}</p><p class="text-xs">${c.contenido}</p></div></div>`;
+            });
+        }
+
+        async function enviarComentario(pid) {
+            const t = document.getElementById('txt-com').value;
+            if(!t) return;
+            await _supabase.from('Comentarios').insert([{post_id: pid, usuario_id: uActivo.id, contenido: t}]);
+            document.querySelector('.fixed.inset-0.z-\\[3000\\]').remove();
+            renderFeedMuro(document.getElementById('section-body'));
+        }
+
+        // --- PERFIL Y NUEVO BOTÓN DE CATÁLOGO ---
         async function renderPerfil(container, esMio) {
-            const { count: nSeguidores } = await _supabase.from('Seguidores').select('*', {count:'exact', head:true}).eq('seguido_id', perfilViendo.id);
-            
             container.innerHTML = `
                 <div class="relative mb-28">
-                    <div class="banner-container">
-                        <img id="p-banner" src="${perfilViendo.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400'}" class="w-full h-full object-cover">
-                        ${esMio ? `<label class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-all cursor-pointer"><i data-lucide="camera"></i><input type="file" onchange="editImg(this, 'banner')"></label>` : ''}
-                    </div>
-                    <div class="absolute -bottom-16 left-1/2 -translate-x-1/2">
-                        <div class="relative group">
-                            <img id="p-foto" src="${perfilViendo.foto || ''}" class="w-40 h-40 rounded-full border-[10px] border-black object-cover">
-                            ${esMio ? `<label class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-all cursor-pointer"><i data-lucide="camera" class="w-5"></i><input type="file" onchange="editImg(this, 'foto')"></label>` : ''}
-                        </div>
-                    </div>
+                    <div class="banner-container"><img src="${perfilViendo.banner || ''}" class="w-full h-full object-cover"></div>
+                    <div class="absolute -bottom-16 left-1/2 -translate-x-1/2"><img src="${perfilViendo.foto}" class="w-40 h-40 rounded-full border-[10px] border-black object-cover"></div>
                 </div>
-
                 <div class="text-center px-8 mb-6">
-                    ${modoEdicion ? `<input id="new-name" value="${perfilViendo.nombre}" class="bg-white/5 border border-red-600 p-4 rounded-xl text-center font-black uppercase w-full">` : `<h2 class="text-3xl font-black italic uppercase">${perfilViendo.nombre}</h2>`}
-                    <div class="flex justify-center mt-3 gap-1">
-                        ${[1,2,3,4,5].map(() => `<i data-lucide="star" class="w-4 text-zinc-800"></i>`).join('')}
-                    </div>
-                    <p class="text-[10px] font-black text-zinc-500 uppercase mt-4 tracking-widest">${nSeguidores || 0} SEGUIDORES</p>
-                    ${esMio ? `<button onclick="toggleEdicion()" class="mt-4 text-[10px] font-black text-red-500 uppercase">${modoEdicion ? 'GUARDAR' : 'EDITAR PERFIL'}</button>` : ''}
+                    <h2 class="text-3xl font-black italic uppercase">${perfilViendo.nombre}</h2>
+                    <div class="flex justify-center mt-3 gap-1">${[1,2,3,4,5].map(() => `<i data-lucide="star" class="w-4 text-zinc-800"></i>`).join('')}</div>
+                    <p class="text-[10px] font-black text-zinc-500 uppercase mt-4 tracking-widest">0 SEGUIDORES</p>
+                    ${esMio ? `<button onclick="toggleEdicion()" class="mt-4 text-[10px] font-black text-red-500 uppercase">EDITAR PERFIL</button>` : ''}
                 </div>
-
                 <div class="flex justify-around bg-zinc-900/40 mx-6 rounded-[2.5rem] p-1.5 border border-white/5 mb-10">
                     <button onclick="setTab('muro')" class="flex-1 py-4 text-[10px] font-black uppercase rounded-[2rem] ${tabActual==='muro'?'bg-red-600':'text-zinc-500'}">Muro</button>
                     <button onclick="setTab('catalogo')" class="flex-1 py-4 text-[10px] font-black uppercase rounded-[2rem] ${tabActual==='catalogo'?'bg-red-600':'text-zinc-500'}">Catálogo</button>
                     <button onclick="setTab('resenas')" class="flex-1 py-4 text-[10px] font-black uppercase rounded-[2rem] ${tabActual==='resenas'?'bg-red-600':'text-zinc-500'}">Reseñas</button>
                 </div>
-                <div id="cont-perf" class="px-5"></div>`;
+                <div id="cont-perf" class="px-5 pb-20"></div>`;
             renderTabContent(esMio);
             lucide.createIcons();
         }
@@ -232,111 +250,94 @@
         function renderTabContent(esMio) {
             const cont = document.getElementById('cont-perf');
             if(tabActual === 'muro') {
-                if(esMio) renderPublicador(cont);
+                if(esMio) cont.innerHTML = `<button onclick="abrirPublicador()" class="w-full glass p-6 rounded-[2rem] mb-10 font-black text-[10px] uppercase italic border-white/10 tracking-widest">+ NUEVA PUBLICACIÓN</button>`;
                 cargarMuroPerfil();
             } else if(tabActual === 'catalogo') {
-                if(esMio) renderPublicadorProducto(cont);
+                if(esMio) cont.innerHTML = `<button onclick="abrirPanelCatalogo()" class="w-full btn-premium p-6 rounded-[2rem] mb-10 font-black text-[10px] uppercase italic tracking-widest">+ AGREGAR AL CATÁLOGO</button>`;
+                cont.innerHTML += `<div id="grid-catalogo" class="grid grid-cols-2 gap-4"></div>`;
                 cargarCatalogoPerfil();
             } else if(tabActual === 'resenas') {
-                renderSeccionResenas(cont, esMio);
+                cont.innerHTML = `<div id="lista-resenas" class="space-y-6"></div>`;
+                cargarResenas();
             }
         }
 
-        function renderPublicador(cont) {
-            cont.innerHTML = `
-            <div class="glass p-8 rounded-[3rem] mb-12 border-white/10">
-                <textarea id="post-text" placeholder="¿QUÉ QUIERES ANUNCIAR?" class="w-full bg-transparent text-sm font-bold p-2 outline-none uppercase h-24 text-white"></textarea>
-                <div id="post-prev-box" class="hidden mb-6 rounded-3xl overflow-hidden h-48 border border-white/10"><img id="post-prev-img" class="w-full h-full object-cover"></div>
-                <div class="flex justify-between items-center pt-6 border-t border-white/5">
-                    <label class="cursor-pointer text-zinc-400 flex items-center gap-2"><i data-lucide="image" class="w-5"></i><span class="text-[9px] font-black uppercase">Imagen</span><input type="file" onchange="previsualizarPost(this)"></label>
-                    <button onclick="publicarEnMuro()" class="btn-premium px-10 py-4 rounded-2xl font-black text-[10px] uppercase">Publicar</button>
-                </div>
-            </div>`;
-        }
-
-        function renderPublicadorProducto(cont) {
-            cont.innerHTML = `
-            <div class="glass p-8 rounded-[3rem] mb-12 border-white/10">
-                <p class="text-[10px] font-black mb-4 uppercase text-red-500">Nuevo Producto / Servicio</p>
-                <input id="prod-nombre" placeholder="NOMBRE DEL PRODUCTO" class="w-full bg-white/5 p-4 rounded-xl mb-4 text-xs font-bold uppercase outline-none">
-                <input id="prod-precio" placeholder="PRECIO" class="w-full bg-white/5 p-4 rounded-xl mb-4 text-xs font-bold uppercase outline-none">
-                <div id="prod-prev-box" class="hidden mb-4 rounded-2xl overflow-hidden h-32 border border-white/10"><img id="prod-prev-img" class="w-full h-full object-cover"></div>
-                <div class="flex justify-between items-center">
-                    <label class="cursor-pointer text-zinc-500 flex items-center gap-2"><i data-lucide="camera" class="w-4"></i><input type="file" onchange="prevProd(this)"></label>
-                    <button onclick="subirProducto()" class="btn-premium px-8 py-3 rounded-xl font-black text-[9px] uppercase">Agregar</button>
-                </div>
-            </div><div id="grid-catalogo" class="grid grid-cols-2 gap-4"></div>`;
-        }
-
-        function renderSeccionResenas(cont, esMio) {
-            cont.innerHTML = `
-                ${!esMio ? `
-                <div class="glass p-8 rounded-[3rem] mb-10 border-white/10 text-center">
-                    <p class="text-[10px] font-black uppercase mb-6">Califica este negocio</p>
-                    <div class="flex justify-center gap-4 mb-8">
-                        ${[1,2,3,4,5].map(i => `<button onclick="calificar(${i})"><i data-lucide="star" class="w-8 text-zinc-800 hover:text-yellow-500"></i></button>`).join('')}
+        // --- PANELES FLOTANTES (REEMPLAZO DE CUADROS FIJOS) ---
+        function abrirPanelCatalogo() {
+            const m = document.createElement('div');
+            m.className = "fixed inset-0 z-[4000] bg-black/90 backdrop-blur-xl flex items-end";
+            m.innerHTML = `
+                <div class="w-full bg-zinc-950 rounded-t-[3rem] p-10 border-t border-white/10">
+                    <div class="flex justify-between items-center mb-10">
+                        <p class="font-black italic uppercase text-lg text-red-600">Nuevo Ítem</p>
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()"><i data-lucide="x"></i></button>
                     </div>
-                    <textarea id="resena-txt" placeholder="Escribe tu experiencia..." class="w-full bg-white/5 p-4 rounded-2xl text-xs font-bold outline-none h-24 uppercase"></textarea>
-                    <button onclick="enviarResena()" class="btn-premium w-full py-4 rounded-2xl font-black text-[10px] mt-4 uppercase">Enviar Reseña</button>
-                </div>` : ''}
-                <div id="lista-resenas" class="space-y-6"></div>`;
-            cargarResenas();
-        }
-
-        // --- FUNCIONES DE CARGA ---
-        async function cargarCatalogoPerfil() {
-            const grid = document.getElementById('grid-catalogo');
-            const { data } = await _supabase.from('Productos').select('*').eq('usuario_id', perfilViendo.id);
-            if(data) data.forEach(p => {
-                grid.innerHTML += `
-                    <div class="glass p-4 rounded-[2rem] border-white/5">
-                        <img src="${p.imagen}" class="w-full h-32 object-cover rounded-2xl mb-4">
-                        <p class="text-[10px] font-black uppercase truncate">${p.nombre}</p>
-                        <p class="text-[10px] font-black text-red-500 mt-1">${p.precio}</p>
-                    </div>`;
-            });
-        }
-
-        async function cargarResenas() {
-            const list = document.getElementById('lista-resenas');
-            const { data } = await _supabase.from('Valoraciones').select('*, Perfiles(*)').eq('tienda_id', perfilViendo.id).order('id', {ascending:false});
-            if(data && data.length > 0) {
-                list.innerHTML = data.map(r => `
-                    <div class="glass p-6 rounded-[2rem] border-white/5">
-                        <div class="flex items-center gap-3 mb-4">
-                            <img src="${r.Perfiles.foto}" class="w-8 h-8 rounded-full">
-                            <div>
-                                <p class="text-[9px] font-black uppercase">${r.Perfiles.nombre}</p>
-                                <div class="flex gap-0.5 mt-0.5">
-                                    ${Array(r.estrellas).fill(0).map(()=>`<i data-lucide="star" class="w-2 text-yellow-500 fill-yellow-500"></i>`).join('')}
-                                </div>
-                            </div>
-                        </div>
-                        <p class="text-[11px] text-zinc-400 font-bold uppercase">${r.comentario}</p>
-                    </div>`).join('');
-            } else {
-                list.innerHTML = `<p class="text-center opacity-20 font-black italic py-10">Sin reseñas aún</p>`;
-            }
+                    <div class="space-y-4">
+                        <select id="tipo-item" onchange="checkWhatsApp(this.value)" class="w-full bg-white/5 p-5 rounded-2xl outline-none font-bold text-xs uppercase text-zinc-400">
+                            <option value="articulo">Artículo / Producto</option>
+                            <option value="servicio">Servicio Profesional</option>
+                        </select>
+                        <input id="cat-nom" placeholder="NOMBRE" class="w-full bg-white/5 p-5 rounded-2xl outline-none font-bold text-xs uppercase">
+                        <input id="cat-desc" placeholder="DESCRIPCIÓN BREVE" class="w-full bg-white/5 p-5 rounded-2xl outline-none font-bold text-xs uppercase text-white">
+                        <input id="cat-pre" placeholder="PRECIO" class="w-full bg-white/5 p-5 rounded-2xl outline-none font-bold text-xs uppercase">
+                        <input id="cat-ws" placeholder="WHATSAPP (Solo servicios)" class="hidden w-full bg-white/5 p-5 rounded-2xl outline-none font-bold text-xs uppercase border border-green-500/30">
+                        
+                        <div id="prev-cat" class="hidden h-32 rounded-2xl overflow-hidden mb-4 border border-white/10"><img id="img-prev-cat" class="w-full h-full object-cover"></div>
+                        
+                        <label class="block w-full text-center p-5 border-2 border-dashed border-white/10 rounded-2xl font-black text-[10px] uppercase text-zinc-500 cursor-pointer">
+                            Subir Foto <input type="file" onchange="prevF(this, 'img-prev-cat', 'prev-cat')">
+                        </label>
+                        <button onclick="guardarEnCatalogo()" class="w-full btn-premium py-6 rounded-2xl font-black italic uppercase tracking-widest mt-6">Confirmar Registro</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(m);
             lucide.createIcons();
         }
 
-        // --- ACCIONES SUPABASE ---
-        async function subirProducto() {
-            const n = document.getElementById('prod-nombre').value;
-            const p = document.getElementById('prod-precio').value;
-            if(!n || !tempPostImg) return alert("Faltan datos");
-            await _supabase.from('Productos').insert([{usuario_id: uActivo.id, nombre: n, precio: p, imagen: tempPostImg}]);
+        function checkWhatsApp(v) { document.getElementById('cat-ws').classList.toggle('hidden', v !== 'servicio'); }
+
+        async function guardarEnCatalogo() {
+            const n = document.getElementById('cat-nom').value;
+            const d = document.getElementById('cat-desc').value;
+            const p = document.getElementById('cat-pre').value;
+            const t = document.getElementById('tipo-item').value;
+            const ws = document.getElementById('cat-ws').value;
+            if(!n || !tempPostImg) return alert("Falta nombre e imagen");
+            
+            await _supabase.from('Productos').insert([{
+                usuario_id: uActivo.id, nombre: n, descripcion: d, precio: p, tipo: t, whatsapp: ws, imagen: tempPostImg
+            }]);
             tempPostImg = null;
+            document.querySelector('.fixed.inset-0.z-\\[4000\\]').remove();
             setTab('catalogo');
         }
 
-        function prevProd(input) { if (input.files[0]) { const r = new FileReader(); r.onload = e => { tempPostImg = e.target.result; document.getElementById('prod-prev-img').src = tempPostImg; document.getElementById('prod-prev-box').classList.remove('hidden'); }; r.readAsDataURL(input.files[0]); } }
-        function previsualizarPost(input) { if (input.files[0]) { const r = new FileReader(); r.onload = e => { tempPostImg = e.target.result; document.getElementById('post-prev-img').src = tempPostImg; document.getElementById('post-prev-box').classList.remove('hidden'); }; r.readAsDataURL(input.files[0]); } }
-        async function publicarEnMuro() {
-            const txt = document.getElementById('post-text').value;
-            await _supabase.from('Publicaciones').insert([{ autor_id: uActivo.id, descripcion: txt, imagen: tempPostImg }]);
-            tempPostImg = null;
-            renderPerfil(document.getElementById('section-body'), true);
+        function prevF(input, imgId, boxId) {
+            if (input.files[0]) {
+                const r = new FileReader();
+                r.onload = e => {
+                    tempPostImg = e.target.result;
+                    document.getElementById(imgId).src = tempPostImg;
+                    document.getElementById(boxId).classList.remove('hidden');
+                };
+                r.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // --- FUNCIONES RESTANTES ---
+        async function cargarCatalogoPerfil() {
+            const { data } = await _supabase.from('Productos').select('*').eq('usuario_id', perfilViendo.id);
+            const grid = document.getElementById('grid-catalogo');
+            if(data) data.forEach(p => {
+                grid.innerHTML += `
+                <div class="glass p-4 rounded-[2.5rem] border-white/10 relative">
+                    <img src="${p.imagen}" class="w-full h-32 object-cover rounded-[1.5rem] mb-4">
+                    <p class="text-[9px] font-black uppercase truncate">${p.nombre}</p>
+                    <p class="text-[9px] font-black text-red-500 mt-1">${p.precio}</p>
+                    ${p.tipo === 'servicio' ? `<a href="https://wa.me/${p.whatsapp}" class="absolute top-6 right-6 bg-green-500 p-2 rounded-full shadow-lg"><i data-lucide="phone" class="w-3 text-white"></i></a>` : ''}
+                </div>`;
+            });
+            lucide.createIcons();
         }
 
         async function cargarMuroPerfil() {
@@ -346,18 +347,8 @@
             lucide.createIcons();
         }
 
-        async function editImg(input, tipo) { const r = new FileReader(); r.onload = async e => { const d = tipo === 'foto' ? { foto: e.target.result } : { banner: e.target.result }; await _supabase.from('Perfiles').update(d).eq('id', uActivo.id); await actUser(); perfilViendo = uActivo; renderPerfil(document.getElementById('section-body'), true); }; r.readAsDataURL(input.files[0]); }
-        async function toggleEdicion() { if(modoEdicion) { const n = document.getElementById('new-name').value; await _supabase.from('Perfiles').update({ nombre: n }).eq('id', uActivo.id); await actUser(); perfilViendo = uActivo; } modoEdicion = !modoEdicion; renderPerfil(document.getElementById('section-body'), true); }
         function setTab(t) { tabActual = t; renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id); }
         function cerrarSesion() { localStorage.removeItem('sesion_fierrox'); location.reload(); }
-        async function renderGuardados(container) {
-            container.innerHTML = `<div class="pt-16 px-10 mb-10"><h2 class="text-4xl font-black italic uppercase">Guardados</h2></div><div id="list-guardados"></div>`;
-            const { data } = await _supabase.from('Guardados').select('*, Publicaciones(*, Perfiles(*))').eq('usuario_id', uActivo.id);
-            if(data) data.forEach(g => { if(g.Publicaciones) document.getElementById('list-guardados').innerHTML += renderPostCard(g.Publicaciones, g.Publicaciones.Perfiles, 0, 0, false, true); });
-            lucide.createIcons();
-        }
-        function abrirComentarios(pid) { alert("Sistema de comentarios abierto. Post ID: " + pid); }
-        function compartirPost(pid, txt) { const url = window.location.href + "?post=" + pid; if(navigator.share) navigator.share({title: 'FierroX', text: txt, url: url}); else { navigator.clipboard.writeText(url); alert("Link copiado"); } }
     </script>
 </body>
 </html>
