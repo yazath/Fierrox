@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -87,7 +88,8 @@
     </nav>
 
     <script>
-    const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
+
+const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
 const SB_KEY = 'sb_publishable_rQfM6eBNu4ZnzIQBVDYpJg_3Xq0PKoV';
 const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
@@ -528,6 +530,10 @@ async function publicar() {
     await _supabase.from('Perfiles').update({ posts: JSON.stringify(uActivo.posts) }).eq('id', uActivo.id);
     renderPerfil(document.getElementById('section-body'), true);
 }
+
+
+
+
 
 
     </script>
