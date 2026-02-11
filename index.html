@@ -3,58 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FierroX Pro v1.7 - Marketplace</title>
+    <title>FierroX Pro v1.8</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #000; color: white; margin: 0; overflow-x: hidden; }
-        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: white; margin: 0; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .btn-premium { background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%); transition: all 0.3s; }
+        .btn-premium:active { transform: scale(0.95); }
         .hidden { display: none !important; }
-        .nav-item { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
-        .nav-item.active { filter: drop-shadow(0px 0px 8px rgba(220,38,38,0.8)); transform: translateY(-4px); opacity: 1 !important; grayscale: 0 !important; }
+        input[type="file"] { display: none; }
         
-        /* Centrado de imagen manual simulado */
-        .img-center { object-fit: cover; object-position: center; }
-        
-        /* Scrollbar estética */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        
-        .floating-btn {
-            position: fixed; bottom: 100px; right: 20px; z-index: 500;
-            animation: bounce 2s infinite;
-        }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        /* Animación para modales */
+        .modal-in { animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .nav-item { transition: 0.3s; opacity: 0.4; grayscale: 100%; }
+        .nav-item.active { opacity: 1; grayscale: 0; filter: drop-shadow(0 0 10px rgba(220,38,38,0.5)); }
     </style>
 </head>
 <body>
 
-    <section id="login-screen" class="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center px-6">
-        <img src="barra logo.png" class="h-10 mb-12 opacity-80" onerror="this.src='https://via.placeholder.com/150x40?text=FIERROX'">
-        <div class="glass p-10 rounded-[3rem] w-full max-w-sm shadow-2xl">
-            <input type="email" id="login-email" placeholder="EMAIL" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-4 text-center font-black text-[10px] uppercase tracking-tighter outline-none focus:border-red-600 transition-all">
-            <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-8 text-center font-black text-[10px] uppercase tracking-tighter outline-none focus:border-red-600 transition-all">
-            <button onclick="iniciarSesion()" class="w-full bg-red-600 text-white font-black py-5 rounded-2xl text-[10px] tracking-[0.2em] italic hover:bg-red-700 transition-colors">ENTRAR</button>
+    <section id="login-screen" class="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center px-8">
+        <img src="barra logo.png" class="h-12 mb-12" onerror="this.src='https://via.placeholder.com/200x50?text=FIERROX'">
+        <div class="glass p-10 rounded-[3rem] w-full max-w-sm shadow-2xl border-white/5">
+            <input type="email" id="login-email" placeholder="EMAIL CORPORATIVO" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-4 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
+            <input type="password" id="login-pass" placeholder="CONTRASEÑA" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-8 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
+            <button onclick="iniciarSesion()" class="w-full btn-premium text-white font-black py-5 rounded-2xl text-[11px] tracking-widest italic shadow-xl shadow-red-900/20">ENTRAR AL SISTEMA</button>
         </div>
     </section>
 
-    <header id="main-header" class="fixed top-0 left-0 right-0 z-[60] bg-black/80 backdrop-blur-md border-b border-white/5 py-4 px-6 hidden">
-        <div id="section-title" class="text-center font-black italic uppercase text-[10px] tracking-widest text-zinc-500"></div>
+    <header id="main-header" class="fixed top-0 left-0 right-0 z-[60] bg-black/80 backdrop-blur-xl border-b border-white/5 py-5 px-6 hidden">
+        <div id="section-title" class="text-center font-black italic uppercase text-[10px] tracking-[0.3em] text-zinc-400"></div>
     </header>
 
     <main id="main-content" class="hidden min-h-screen">
-        <div id="section-body" class="w-full max-w-2xl mx-auto"></div>
+        <div id="section-body" class="w-full max-w-xl mx-auto"></div>
     </main>
 
-    <nav id="nav-bar" class="hidden fixed bottom-0 left-0 right-0 glass border-t border-white/5 px-6 pt-4 pb-8 z-[100]">
+    <nav id="nav-bar" class="hidden fixed bottom-0 left-0 right-0 glass border-t border-white/5 px-8 pt-4 pb-10 z-[100]">
         <div class="flex justify-around items-center max-w-md mx-auto">
-            <div onclick="navegar('panel', this)" class="nav-item active"><img src="barra logo.png" class="w-6"></div>
-            <div onclick="navegar('canastilla', this)" class="nav-item opacity-40 grayscale"><img src="barra canastilla.png" class="w-6"></div>
-            <div onclick="navegar('buscador', this)" class="nav-item opacity-40 grayscale"><img src="barra buscador.png" class="w-6"></div>
-            <div onclick="navegar('menu', this)" class="nav-item opacity-40 grayscale"><img src="barra menu.png" class="w-6"></div>
+            <div onclick="navegar('panel', this)" class="nav-item active"><img src="barra logo.png" class="w-7"></div>
+            <div onclick="navegar('canastilla', this)" class="nav-item"><img src="barra canastilla.png" class="w-7"></div>
+            <div onclick="navegar('buscador', this)" class="nav-item"><img src="barra buscador.png" class="w-7"></div>
+            <div onclick="navegar('menu', this)" class="nav-item"><img src="barra menu.png" class="w-7"></div>
         </div>
     </nav>
 
@@ -67,6 +61,7 @@
         let perfilViendo = null;
         let modoEdicion = false;
         let tabActual = 'muro';
+        let tempPostImg = null;
 
         // --- INICIO ---
         window.onload = async () => {
@@ -80,6 +75,7 @@
         };
 
         function parseUserData(user) {
+            // Corrección para que cualquier usuario entre aunque sus datos estén vacíos
             user.posts = JSON.parse(user.posts || '[]');
             user.seguidores = JSON.parse(user.seguidores || '[]');
             user.tienda = JSON.parse(user.tienda || '{"activa":false,"catalogo":[],"reseñas":[]}');
@@ -87,14 +83,15 @@
         }
 
         async function iniciarSesion() {
-            const e = document.getElementById('login-email').value.toLowerCase();
+            const e = document.getElementById('login-email').value.toLowerCase().trim();
             const p = document.getElementById('login-pass').value;
-            const { data } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
+            const { data, error } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
+            
             if (data && data.pass === p) {
                 uActivo = data; parseUserData(uActivo);
                 localStorage.setItem('sesion_fierrox', JSON.stringify(uActivo));
                 entrarApp();
-            } else { alert("Error de acceso"); }
+            } else { alert("Credenciales incorrectas o usuario no encontrado."); }
         }
 
         function entrarApp() {
@@ -104,138 +101,238 @@
             navegar('panel', document.querySelector('.nav-item'));
         }
 
-        // --- MOTOR DE NAVEGACIÓN ---
         function navegar(sec, el) {
-            modoEdicion = false; tabActual = 'muro';
-            document.querySelectorAll('.nav-item').forEach(i => { i.classList.add('opacity-40', 'grayscale'); i.classList.remove('active'); });
-            if(el) { el.classList.remove('opacity-40', 'grayscale'); el.classList.add('active'); }
+            modoEdicion = false;
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            if(el) el.classList.add('active');
 
             const body = document.getElementById('section-body');
             const header = document.getElementById('main-header');
             const title = document.getElementById('section-title');
 
             body.innerHTML = '';
-            
             if(sec === 'panel') {
-                header.classList.add('hidden'); // Muro hasta arriba
+                header.classList.add('hidden');
                 cargarFeedGlobal(body);
             } else {
                 header.classList.remove('hidden');
-                if(sec === 'canastilla') { title.innerText = 'Canastilla'; renderCanastilla(body); }
-                if(sec === 'buscador') { title.innerText = 'Explorar'; renderBuscador(body); }
+                if(sec === 'canastilla') { title.innerText = 'MI CANASTILLA'; renderCanastilla(body); }
+                if(sec === 'buscador') { title.innerText = 'EXPLORAR'; body.innerHTML = '<div class="p-10 text-center opacity-20 font-black italic">PRÓXIMAMENTE</div>'; }
                 if(sec === 'menu') { title.innerText = ''; perfilViendo = uActivo; renderPerfil(body, true); }
             }
             lucide.createIcons();
         }
 
-        // --- RENDER PERFIL ---
+        // --- PERFIL ---
         function renderPerfil(container, esMio) {
             const esTienda = perfilViendo.tienda?.activa;
             const bannerImg = esTienda ? (perfilViendo.tienda.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400') : null;
             
             container.innerHTML = `
-                <div class="relative mb-20">
-                    <div class="w-full h-64 relative bg-zinc-950 overflow-hidden">
-                        ${esTienda ? `<img id="v-banner" src="${bannerImg}" class="w-full h-full object-cover opacity-60">` : ''}
+                <div class="relative mb-24">
+                    <div class="w-full h-72 relative bg-zinc-950 overflow-hidden">
+                        ${esTienda ? `<img src="${bannerImg}" class="w-full h-full object-cover opacity-50">` : '<div class="w-full h-full bg-gradient-to-br from-zinc-900 to-black"></div>'}
                         <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent"></div>
                         
                         ${esMio ? `
-                        <div class="absolute top-20 right-6 z-50">
-                            <button onclick="toggleMenuOptions()" class="bg-black/60 p-3 rounded-2xl border border-white/10"><i data-lucide="more-horizontal"></i></button>
-                            <div id="drop-menu" class="hidden absolute right-0 mt-2 w-48 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                                <button onclick="activarModoEdicion()" class="w-full p-4 text-[9px] font-black uppercase text-left border-b border-white/5">Editar Perfil</button>
-                                ${!esTienda ? `<button onclick="abrirModalTienda()" class="w-full p-4 text-[9px] font-black text-yellow-500 uppercase text-left border-b border-white/5">Crear Tienda</button>` : ''}
-                                <button onclick="cerrarSesion()" class="w-full p-4 text-[9px] font-black text-red-500 uppercase text-left">Cerrar Sesión</button>
+                        <div class="absolute top-24 right-6 z-50">
+                            <button onclick="toggleMenu()" class="glass p-4 rounded-3xl border-white/10 shadow-2xl"><i data-lucide="align-right" class="w-6"></i></button>
+                            <div id="drop-menu" class="hidden absolute right-0 mt-4 w-56 glass rounded-[2rem] overflow-hidden shadow-2xl border-white/10">
+                                <button onclick="activarModoEdicion()" class="w-full p-5 text-[10px] font-black uppercase text-left border-b border-white/5 hover:bg-white/5 transition">Editar Perfil</button>
+                                ${!esTienda ? `<button onclick="abrirModalTienda()" class="w-full p-5 text-[10px] font-black text-yellow-500 uppercase text-left border-b border-white/5 hover:bg-white/5 transition">Activar Tienda</button>` : ''}
+                                <button onclick="cerrarSesion()" class="w-full p-5 text-[10px] font-black text-red-500 uppercase text-left hover:bg-white/5 transition">Cerrar Sesión</button>
                             </div>
                         </div>` : ''}
 
                         ${modoEdicion && esTienda ? `
-                        <label class="absolute inset-0 flex items-center justify-center bg-black/40 cursor-pointer">
-                            <i data-lucide="camera" class="w-8 h-8"></i>
-                            <input type="file" onchange="subirImagen(this, 'banner')">
+                        <label class="absolute inset-0 flex flex-col items-center justify-center bg-black/60 cursor-pointer">
+                            <div class="bg-white/10 p-5 rounded-full border border-white/20 backdrop-blur-md mb-2"><i data-lucide="camera" class="w-8"></i></div>
+                            <span class="text-[9px] font-black uppercase tracking-widest">Cambiar Banner</span>
+                            <input type="file" onchange="subirImg(this, 'banner')">
                         </label>` : ''}
                     </div>
                     
-                    <div class="absolute -bottom-14 left-1/2 -translate-x-1/2">
-                        <div class="relative">
-                            <img src="${perfilViendo.foto}" class="w-32 h-32 rounded-full border-4 border-black object-cover bg-zinc-900">
-                            ${modoEdicion ? `<label class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center cursor-pointer"><i data-lucide="camera"></i><input type="file" onchange="subirImagen(this, 'foto')"></label>` : ''}
+                    <div class="absolute -bottom-16 left-1/2 -translate-x-1/2">
+                        <div class="relative group">
+                            <img src="${perfilViendo.foto}" class="w-40 h-40 rounded-full border-[6px] border-black object-cover shadow-2xl bg-zinc-800">
+                            ${modoEdicion ? `<label class="absolute inset-0 bg-black/50 rounded-full flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-white/30"><i data-lucide="image"></i><input type="file" onchange="subirImg(this, 'foto')"></label>` : ''}
                         </div>
                     </div>
                 </div>
 
-                <div class="text-center px-6 mb-8">
+                <div class="text-center px-8 mb-10">
                     ${modoEdicion ? 
-                        `<input id="edit-nombre" type="text" value="${perfilViendo.nombre}" class="bg-white/5 border border-red-600 p-3 text-center text-xl font-black uppercase rounded-2xl w-full text-white">` :
-                        `<h2 class="text-2xl font-black italic uppercase text-white">${perfilViendo.nombre}</h2>`
+                        `<input id="edit-nombre" type="text" value="${perfilViendo.nombre}" class="bg-white/5 border border-red-600 p-4 text-center text-xl font-black uppercase rounded-2xl w-full text-white shadow-inner">` :
+                        `<h2 class="text-3xl font-black italic uppercase text-white tracking-tighter">${perfilViendo.nombre}</h2>`
                     }
-                    <div class="flex items-center justify-center gap-4 mt-2">
-                        <p class="text-[9px] font-black text-red-600 uppercase tracking-widest">${perfilViendo.seguidores.length} SEGUIDORES</p>
-                        ${esTienda ? `<div class="flex items-center gap-1"><i data-lucide="star" class="w-3 fill-yellow-500 text-yellow-500"></i><span class="text-[10px] font-black">4.9</span></div>` : ''}
+                    <div class="flex items-center justify-center gap-4 mt-3">
+                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest">${perfilViendo.seguidores.length} SEGUIDORES</p>
+                        ${esTienda ? `<div class="flex items-center gap-1 bg-white/5 px-3 py-1 rounded-full border border-white/5"><i data-lucide="star" class="w-3 fill-yellow-500 text-yellow-500"></i><span class="text-[10px] font-black">4.9</span></div>` : ''}
                     </div>
                 </div>
 
                 ${esTienda ? `
-                <div class="flex justify-around bg-zinc-900 mx-6 rounded-full p-1 border border-white/5 mb-8">
-                    <button onclick="setTab('muro')" class="flex-1 py-3 text-[8px] font-black uppercase rounded-full ${tabActual==='muro'?'bg-red-600 text-white':'text-zinc-500'}">Muro</button>
-                    <button onclick="setTab('catalogo')" class="flex-1 py-3 text-[8px] font-black uppercase rounded-full ${tabActual==='catalogo'?'bg-red-600 text-white':'text-zinc-500'}">Catálogo</button>
-                    <button onclick="setTab('reseñas')" class="flex-1 py-3 text-[8px] font-black uppercase rounded-full ${tabActual==='reseñas'?'bg-red-600 text-white':'text-zinc-500'}">Reseñas</button>
+                <div class="flex justify-around bg-zinc-900/50 mx-6 rounded-[2rem] p-1 border border-white/5 mb-10 backdrop-blur-md">
+                    <button onclick="setTab('muro')" class="flex-1 py-4 text-[9px] font-black uppercase rounded-[1.5rem] transition ${tabActual==='muro'?'bg-red-600 text-white shadow-lg shadow-red-600/20':'text-zinc-500'}">Muro</button>
+                    <button onclick="setTab('catalogo')" class="flex-1 py-4 text-[9px] font-black uppercase rounded-[1.5rem] transition ${tabActual==='catalogo'?'bg-red-600 text-white shadow-lg shadow-red-600/20':'text-zinc-500'}">Catálogo</button>
+                    <button onclick="setTab('reseñas')" class="flex-1 py-4 text-[9px] font-black uppercase rounded-[1.5rem] transition ${tabActual==='reseñas'?'bg-red-600 text-white shadow-lg shadow-red-600/20':'text-zinc-500'}">Reseñas</button>
                 </div>` : ''}
 
-                <div id="contenido-perfil" class="px-4 pb-40"></div>
+                <div id="contenido-perfil" class="px-4 pb-48"></div>
 
-                ${modoEdicion ? `<button onclick="finalizarEdicion()" class="floating-btn bg-green-600 text-white px-8 py-4 rounded-full font-black text-[10px] uppercase shadow-lg shadow-green-600/20">Finalizar</button>` : ''}
+                ${modoEdicion ? `<button onclick="finalizarEdicion()" class="fixed bottom-32 left-1/2 -translate-x-1/2 btn-premium text-white px-12 py-5 rounded-full font-black text-[11px] uppercase shadow-2xl z-[500] border border-white/10">GUARDAR CAMBIOS</button>` : ''}
             `;
             renderContenidoTab(esMio);
             lucide.createIcons();
         }
 
-        // --- LÓGICA DE TIENDA Y CATÁLOGO ---
+        // --- PUBLICAR POST (IMAGEN CORREGIDA) ---
         function setTab(t) { tabActual = t; renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id); }
 
         function renderContenidoTab(esMio) {
             const cont = document.getElementById('contenido-perfil');
             if(tabActual === 'muro') {
                 if(perfilViendo.tienda?.activa && esMio) {
-                    cont.innerHTML = `<div class="bg-zinc-900 p-6 rounded-[2.5rem] mb-6 border border-white/5">
-                        <textarea id="p-txt" placeholder="NOVEDADES DE LA TIENDA..." class="w-full bg-transparent text-[11px] font-bold p-2 outline-none uppercase h-12 text-white"></textarea>
-                        <div class="flex justify-between items-center mt-4 pt-4 border-t border-white/5">
-                            <label class="cursor-pointer text-zinc-500"><i data-lucide="image"></i><input type="file" onchange="previewPostImg(this)" class="hidden"></label>
-                            <button onclick="publicarPost()" class="bg-red-600 px-6 py-2 rounded-full font-black text-[9px]">POSTEAR</button>
+                    cont.innerHTML = `
+                    <div class="glass p-8 rounded-[3rem] mb-10 border-white/10 shadow-xl">
+                        <textarea id="p-txt" placeholder="¿QUÉ HAY DE NUEVO?" class="w-full bg-transparent text-[12px] font-bold p-2 outline-none uppercase h-16 text-white placeholder:text-zinc-700"></textarea>
+                        <div id="p-prev-box" class="hidden mb-4 relative rounded-3xl overflow-hidden border border-white/10">
+                            <img id="p-prev-img" class="w-full h-48 object-cover">
+                            <button onclick="cancelPostImg()" class="absolute top-2 right-2 bg-black/70 p-2 rounded-full"><i data-lucide="x" class="w-4"></i></button>
                         </div>
-                        <img id="p-prev" class="hidden w-full rounded-2xl mt-4">
+                        <div class="flex justify-between items-center mt-4 pt-6 border-t border-white/5">
+                            <label class="flex items-center gap-2 cursor-pointer text-zinc-500 hover:text-white transition">
+                                <i data-lucide="image" class="w-5"></i>
+                                <span class="text-[9px] font-black uppercase">Imagen</span>
+                                <input type="file" onchange="previewPost(this)">
+                            </label>
+                            <button onclick="publicar()" class="btn-premium px-8 py-3 rounded-full font-black text-[9px] italic">PUBLICAR</button>
+                        </div>
                     </div>`;
                 }
                 perfilViendo.posts.forEach(p => cont.innerHTML += crearHTMLPost(p, perfilViendo));
             } else if(tabActual === 'catalogo') {
                 cont.innerHTML = `
-                ${esMio ? `<button onclick="abrirModalItem()" class="w-full bg-white text-black p-4 rounded-2xl font-black text-[9px] uppercase mb-6">+ Nuevo Artículo o Servicio</button>` : ''}
-                <div class="grid grid-cols-2 gap-4">
+                ${esMio ? `<button onclick="abrirModalItem()" class="w-full bg-white text-black p-5 rounded-[2rem] font-black text-[10px] uppercase mb-10 shadow-xl">NUEVO ARTÍCULO O SERVICIO</button>` : ''}
+                <div class="grid grid-cols-2 gap-5">
                     ${perfilViendo.tienda.catalogo.map(item => `
-                        <div class="bg-zinc-900 rounded-3xl overflow-hidden border border-white/5 relative">
-                            ${esMio ? `<button onclick="eliminarItem(${item.id})" class="absolute top-2 right-2 bg-black/50 p-2 rounded-full text-red-500"><i data-lucide="trash-2" class="w-3"></i></button>` : ''}
-                            <img src="${item.imgs[0]}" class="w-full h-32 object-cover">
-                            <div class="p-4">
-                                <h4 class="text-[10px] font-black uppercase text-white truncate">${item.nombre}</h4>
-                                <p class="text-[12px] font-black text-red-600 mt-1">$${item.precio}</p>
+                        <div class="glass rounded-[2.5rem] overflow-hidden border-white/5 relative flex flex-col h-full">
+                            ${esMio ? `<button onclick="eliminarItem(${item.id})" class="absolute top-3 right-3 bg-black/60 p-2 rounded-full text-red-500 z-10 backdrop-blur-md"><i data-lucide="trash-2" class="w-4"></i></button>` : ''}
+                            <img src="${item.imgs[0]}" class="w-full h-40 object-cover">
+                            <div class="p-5 flex flex-col flex-1">
+                                <h4 class="text-[11px] font-black uppercase text-white mb-2 leading-tight">${item.nombre}</h4>
+                                <p class="text-red-600 font-black text-sm mb-4">$${item.precio}</p>
                                 ${item.tipo === 'articulo' ? 
-                                `<button onclick='agregarCanastilla(${JSON.stringify(item)})' class="w-full bg-white text-black py-2 rounded-xl text-[8px] font-black uppercase mt-3">Añadir</button>` : 
-                                `<a href="https://wa.me/${item.wa}" class="w-full bg-green-600 text-white py-2 rounded-xl text-[8px] font-black uppercase mt-3 flex justify-center">Cotizar</a>`}
+                                `<button onclick='agregarCanastilla(${JSON.stringify(item)})' class="w-full bg-white text-black py-3 rounded-2xl text-[9px] font-black uppercase mt-auto">Añadir</button>` : 
+                                `<a href="https://wa.me/${item.wa}" class="w-full bg-green-600 text-white py-3 rounded-2xl text-[9px] font-black uppercase mt-auto flex justify-center items-center gap-1"><i data-lucide="phone" class="w-3"></i> WhatsApp</a>`}
                             </div>
                         </div>
                     `).join('')}
                 </div>`;
             }
+            lucide.createIcons();
         }
 
-        // --- FEED GLOBAL (MURO) ---
+        // --- LÓGICA DE POSTS ---
+        function previewPost(input) {
+            if(input.files[0]) {
+                const r = new FileReader();
+                r.onload = e => {
+                    tempPostImg = e.target.result;
+                    document.getElementById('p-prev-img').src = tempPostImg;
+                    document.getElementById('p-prev-box').classList.remove('hidden');
+                };
+                r.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function cancelPostImg() { tempPostImg = null; document.getElementById('p-prev-box').classList.add('hidden'); }
+
+        async function publicar() {
+            const txt = document.getElementById('p-txt').value;
+            if(!txt && !tempPostImg) return;
+            const nuevoPost = { id: Date.now(), d: txt, i: tempPostImg, likes: [], comentarios: [] };
+            uActivo.posts.unshift(nuevoPost);
+            await _supabase.from('Perfiles').update({ posts: JSON.stringify(uActivo.posts) }).eq('id', uActivo.id);
+            tempPostImg = null;
+            renderPerfil(document.getElementById('section-body'), true);
+        }
+
+        // --- MODAL DE ITEM (NUEVO DISEÑO PREMIUM) ---
+        function abrirModalItem() {
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 z-[1000] bg-black/98 flex items-end justify-center pb-10 px-6";
+            modal.innerHTML = `
+            <div class="glass w-full max-w-sm p-10 rounded-[4rem] modal-in border-white/10 relative shadow-2xl">
+                <button onclick="this.parentElement.parentElement.remove()" class="absolute top-8 right-8 text-zinc-600"><i data-lucide="x" class="w-8"></i></button>
+                <h3 class="text-white font-black uppercase text-center mb-10 text-[14px] italic tracking-widest">NUEVO ELEMENTO</h3>
+                <div class="flex gap-2 mb-6 bg-black p-1 rounded-2xl border border-white/5">
+                    <button id="m-t-art" onclick="setModalTipo('articulo')" class="flex-1 py-3 rounded-xl font-black text-[9px] uppercase bg-red-600 text-white">Artículo</button>
+                    <button id="m-t-ser" onclick="setModalTipo('servicio')" class="flex-1 py-3 rounded-xl font-black text-[9px] uppercase text-zinc-500">Servicio</button>
+                </div>
+                <input id="m-nom" placeholder="NOMBRE DEL PRODUCTO" class="w-full bg-white/5 p-5 rounded-2xl text-white font-bold text-[11px] mb-4 outline-none border border-white/5 focus:border-red-600">
+                <input id="m-pre" type="number" placeholder="PRECIO ($)" class="w-full bg-white/5 p-5 rounded-2xl text-white font-bold text-[11px] mb-4 outline-none border border-white/5">
+                <input id="m-wa" placeholder="WHATSAPP PERSONALIZADO" class="hidden w-full bg-white/5 p-5 rounded-2xl text-white font-bold text-[11px] mb-6 outline-none border border-green-600/30">
+                <label class="w-full flex items-center justify-center gap-3 bg-white/5 p-8 rounded-[2rem] border-2 border-dashed border-white/10 mb-8 cursor-pointer hover:border-red-600 transition">
+                    <i data-lucide="image" class="text-zinc-500"></i>
+                    <span class="text-[10px] font-black uppercase text-zinc-500">Subir Fotografía</span>
+                    <input type="file" id="m-img" onchange="previewModalImg(this)">
+                </label>
+                <button onclick="guardarNuevoItem(this)" class="w-full btn-premium py-5 rounded-3xl font-black text-[11px] uppercase tracking-widest italic shadow-xl">LANZAR AL CATÁLOGO</button>
+            </div>`;
+            document.body.appendChild(modal);
+            window.tempItemTipo = 'articulo';
+            lucide.createIcons();
+        }
+
+        function setModalTipo(t) {
+            window.tempItemTipo = t;
+            const a = document.getElementById('m-t-art');
+            const s = document.getElementById('m-t-ser');
+            const wa = document.getElementById('m-wa');
+            if(t === 'articulo') {
+                a.className = "flex-1 py-3 rounded-xl font-black text-[9px] uppercase bg-red-600 text-white";
+                s.className = "flex-1 py-3 rounded-xl font-black text-[9px] uppercase text-zinc-500";
+                wa.classList.add('hidden');
+            } else {
+                s.className = "flex-1 py-3 rounded-xl font-black text-[9px] uppercase bg-red-600 text-white";
+                a.className = "flex-1 py-3 rounded-xl font-black text-[9px] uppercase text-zinc-500";
+                wa.classList.remove('hidden');
+            }
+        }
+
+        async function guardarNuevoItem(btn) {
+            const f = document.getElementById('m-img').files[0];
+            if(!f) { alert("Sube una imagen"); return; }
+            btn.innerHTML = "PROCESANDO...";
+            btn.disabled = true;
+            
+            const r = new FileReader();
+            r.onload = async (e) => {
+                const item = {
+                    id: Date.now(),
+                    tipo: window.tempItemTipo,
+                    nombre: document.getElementById('m-nom').value,
+                    precio: document.getElementById('m-pre').value,
+                    wa: document.getElementById('m-wa').value,
+                    imgs: [e.target.result]
+                };
+                uActivo.tienda.catalogo.push(item);
+                await _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id);
+                btn.parentElement.parentElement.remove();
+                renderPerfil(document.getElementById('section-body'), true);
+            };
+            r.readAsDataURL(f);
+        }
+
+        // --- FEED GLOBAL ---
         async function cargarFeedGlobal(container) {
             const { data } = await _supabase.from('Perfiles').select('*');
             let feed = [];
             data.forEach(u => {
-                const posts = JSON.parse(u.posts || '[]');
+                const ps = JSON.parse(u.posts || '[]');
                 const t = JSON.parse(u.tienda || '{}');
-                if(t.activa) posts.forEach(p => feed.push({...p, uData: u}));
+                if(t.activa) ps.forEach(p => feed.push({...p, uData: u}));
             });
             feed.sort((a,b) => b.id - a.id);
             container.innerHTML = feed.map(p => crearHTMLPost(p, p.uData)).join('');
@@ -246,182 +343,63 @@
             const isLiked = p.likes?.includes(uActivo.id);
             const esMio = uData.id === uActivo.id;
             return `
-            <div class="bg-zinc-900/40 mb-1 border-b border-white/5 relative">
-                ${esMio ? `
-                <div class="absolute top-6 right-6 z-40">
-                    <button onclick="eliminarPost(${uData.id}, ${p.id})" class="text-zinc-600"><i data-lucide="x" class="w-5"></i></button>
-                </div>` : ''}
-                <div class="p-6 flex items-center gap-3">
-                    <img onclick="verPerfilPublico(${uData.id})" src="${uData.foto}" class="w-10 h-10 rounded-full object-cover border border-white/10 cursor-pointer">
-                    <div onclick="verPerfilPublico(${uData.id})" class="cursor-pointer">
-                        <p class="text-[10px] font-black uppercase italic text-white">${uData.nombre}</p>
-                        ${JSON.parse(uData.tienda).verificada ? '<span class="text-[7px] bg-red-600 px-1 rounded text-white font-bold">VERIFICADA</span>' : ''}
+            <div class="bg-zinc-950/50 mb-4 border-b border-white/5">
+                <div class="p-6 flex items-center justify-between">
+                    <div class="flex items-center gap-3" onclick="verPerfilPublico(${uData.id})">
+                        <img src="${uData.foto}" class="w-10 h-10 rounded-full object-cover border border-white/10">
+                        <span class="text-[10px] font-black uppercase text-white">${uData.nombre}</span>
                     </div>
+                    ${esMio ? `<button onclick="eliminarPost(${uData.id}, ${p.id})" class="text-zinc-700 p-2"><i data-lucide="trash-2" class="w-4"></i></button>` : ''}
                 </div>
-                ${p.i ? `<img src="${p.i}" class="w-full max-h-[500px] object-cover">` : ''}
+                ${p.i ? `<img src="${p.i}" class="w-full max-h-[500px] object-cover border-y border-white/5">` : ''}
                 <div class="p-6">
-                    <p class="text-[12px] text-zinc-300 font-medium leading-relaxed mb-6">${p.d}</p>
-                    <div class="flex gap-6 pt-4 border-t border-white/5">
+                    <p class="text-[12px] text-zinc-300 font-medium mb-6 leading-relaxed">${p.d}</p>
+                    <div class="flex gap-6">
                         <button onclick="darLike(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black ${isLiked ? 'text-red-600' : 'text-zinc-500'}">
                             <i data-lucide="heart" class="w-5 ${isLiked ? 'fill-red-600' : ''}"></i> ${p.likes?.length || 0}
                         </button>
-                        <button onclick="abrirComentarios(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black text-zinc-500">
-                            <i data-lucide="message-square" class="w-5"></i> ${p.comentarios?.length || 0}
-                        </button>
                     </div>
                 </div>
             </div>`;
         }
 
-        // --- ACCIONES SUPABASE (LIKES, COMENTS, DELETE) ---
-        async function darLike(uId, pId) {
-            const { data } = await _supabase.from('Perfiles').select('posts').eq('id', uId).single();
-            let ps = JSON.parse(data.posts);
-            ps = ps.map(p => {
-                if(p.id === pId) {
-                    p.likes = p.likes || [];
-                    if(p.likes.includes(uActivo.id)) p.likes = p.likes.filter(id => id !== uActivo.id);
-                    else p.likes.push(uActivo.id);
-                }
-                return p;
-            });
-            await _supabase.from('Perfiles').update({ posts: JSON.stringify(ps) }).eq('id', uId);
-            refrescarVista();
-        }
-
-        async function eliminarPost(uId, pId) {
-            if(!confirm("¿Eliminar post?")) return;
-            const { data } = await _supabase.from('Perfiles').select('posts').eq('id', uId).single();
-            let ps = JSON.parse(data.posts).filter(p => p.id !== pId);
-            await _supabase.from('Perfiles').update({ posts: JSON.stringify(ps) }).eq('id', uId);
-            refrescarVista();
-        }
-
-        async function refrescarVista() {
-            if(perfilViendo) {
-                const { data } = await _supabase.from('Perfiles').select('*').eq('id', perfilViendo.id).single();
-                perfilViendo = data; parseUserData(perfilViendo);
-                renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
-            } else {
-                cargarFeedGlobal(document.getElementById('section-body'));
-            }
-        }
-
-        // --- CANASTILLA ---
-        async function agregarCanastilla(item) {
-            uActivo.canastilla.push({...item, date: Date.now()});
-            await _supabase.from('Perfiles').update({ canastilla: JSON.stringify(uActivo.canastilla) }).eq('id', uActivo.id);
-            alert("Agregado a canastilla");
-        }
-
-        function renderCanastilla(container) {
-            if(uActivo.canastilla.length === 0) {
-                container.innerHTML = '<div class="text-center py-40 font-black text-zinc-800 uppercase italic">Vacío</div>';
-                return;
-            }
-            container.innerHTML = `<div class="p-6 space-y-4">
-                ${uActivo.canastilla.map((it, i) => `
-                    <div class="bg-zinc-900 p-4 rounded-[2rem] flex gap-4 border border-white/5">
-                        <img src="${it.imgs[0]}" class="w-16 h-16 rounded-xl object-cover">
-                        <div class="flex-1">
-                            <p class="text-[10px] font-black uppercase text-white">${it.nombre}</p>
-                            <p class="text-red-600 font-black text-xs">$${it.precio}</p>
-                            <button onclick="borrarCanastilla(${i})" class="text-[8px] uppercase font-bold text-zinc-600 underline mt-1">Quitar</button>
-                        </div>
-                    </div>
-                `).join('')}
-                <button class="w-full bg-white text-black py-5 rounded-full font-black text-[10px] mt-10 uppercase tracking-widest">Pagar ahora</button>
-            </div>`;
-        }
-
-        async function borrarCanastilla(i) {
-            uActivo.canastilla.splice(i, 1);
-            await _supabase.from('Perfiles').update({ canastilla: JSON.stringify(uActivo.canastilla) }).eq('id', uActivo.id);
-            renderCanastilla(document.getElementById('section-body'));
-        }
-
-        // --- EDICIÓN Y MEDIA ---
-        function activarModoEdicion() { modoEdicion = true; toggleMenuOptions(); renderPerfil(document.getElementById('section-body'), true); }
-
-        async function finalizarEdicion() {
-            const nNombre = document.getElementById('edit-nombre').value;
-            uActivo.nombre = nNombre;
-            await _supabase.from('Perfiles').update({ 
-                nombre: uActivo.nombre, 
-                foto: uActivo.foto, 
-                tienda: JSON.stringify(uActivo.tienda) 
-            }).eq('id', uActivo.id);
-            modoEdicion = false;
+        // --- SISTEMA DE BORRADO ---
+        async function eliminarItem(id) {
+            if(!confirm("¿Eliminar del catálogo?")) return;
+            uActivo.tienda.catalogo = uActivo.tienda.catalogo.filter(i => i.id !== id);
+            await _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id);
             renderPerfil(document.getElementById('section-body'), true);
         }
 
-        async function subirImagen(input, tipo) {
-            const file = input.files[0];
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const base64 = e.target.result;
-                if(tipo === 'foto') uActivo.foto = base64;
-                else uActivo.tienda.banner = base64;
-                renderPerfil(document.getElementById('section-body'), true);
-            };
-            reader.readAsDataURL(file);
+        async function eliminarPost(uid, pid) {
+            if(!confirm("¿Eliminar publicación?")) return;
+            const { data } = await _supabase.from('Perfiles').select('posts').eq('id', uid).single();
+            let ps = JSON.parse(data.posts).filter(p => p.id !== pid);
+            await _supabase.from('Perfiles').update({ posts: JSON.stringify(ps) }).eq('id', uid);
+            if(!perfilViendo) cargarFeedGlobal(document.getElementById('section-body'));
+            else renderPerfil(document.getElementById('section-body'), true);
         }
 
-        // --- UTILIDADES ---
-        function toggleMenuOptions() { document.getElementById('drop-menu').classList.toggle('hidden'); }
+        // --- SOPORTE IMAGENES PERFIL/BANNER ---
+        async function subirImg(input, tipo) {
+            if(input.files[0]) {
+                const r = new FileReader();
+                r.onload = e => {
+                    if(tipo === 'foto') uActivo.foto = e.target.result;
+                    else uActivo.tienda.banner = e.target.result;
+                    renderPerfil(document.getElementById('section-body'), true);
+                };
+                r.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function toggleMenu() { document.getElementById('drop-menu').classList.toggle('hidden'); }
         async function verPerfilPublico(id) {
             const { data } = await _supabase.from('Perfiles').select('*').eq('id', id).single();
             perfilViendo = data; parseUserData(perfilViendo);
             navegar('menu');
         }
         function cerrarSesion() { localStorage.clear(); location.reload(); }
-
-        // MODAL ITEM (Catálogo)
-        function abrirModalItem() {
-            const m = document.createElement('div');
-            m.className = "fixed inset-0 z-[1000] bg-black/95 flex items-center justify-center p-6";
-            m.innerHTML = `
-            <div class="glass p-8 rounded-[3rem] w-full max-w-sm">
-                <h3 class="text-white font-black uppercase text-center mb-6 text-[11px]">Nuevo Item</h3>
-                <select id="it-tipo" class="w-full bg-white/5 p-4 rounded-xl text-white text-[10px] mb-4">
-                    <option value="articulo">ARTÍCULO</option>
-                    <option value="servicio">SERVICIO</option>
-                </select>
-                <input id="it-nom" placeholder="NOMBRE" class="w-full bg-white/5 p-4 rounded-xl text-white text-[10px] mb-3">
-                <input id="it-pre" type="number" placeholder="PRECIO" class="w-full bg-white/5 p-4 rounded-xl text-white text-[10px] mb-3">
-                <input id="it-wa" placeholder="WHATSAPP (Solo si es servicio)" class="w-full bg-white/5 p-4 rounded-xl text-white text-[10px] mb-4">
-                <input type="file" id="it-img" class="text-[8px] mb-6">
-                <button onclick="guardarItem(this)" class="w-full bg-red-600 py-4 rounded-xl font-black text-[10px] uppercase">Guardar</button>
-            </div>`;
-            document.body.appendChild(m);
-        }
-
-        async function guardarItem(btn) {
-            const file = document.getElementById('it-img').files[0];
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const item = {
-                    id: Date.now(),
-                    tipo: document.getElementById('it-tipo').value,
-                    nombre: document.getElementById('it-nom').value,
-                    precio: document.getElementById('it-pre').value,
-                    wa: document.getElementById('it-wa').value,
-                    imgs: [e.target.result]
-                };
-                uActivo.tienda.catalogo.push(item);
-                await _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id);
-                btn.parentElement.parentElement.remove();
-                renderPerfil(document.getElementById('section-body'), true);
-            };
-            reader.readAsDataURL(file);
-        }
-        
-        // MODAL TIENDA
-        function abrirModalTienda() {
-            if(!confirm("Costo mensual: $600. ¿Confirmar activación de tienda?")) return;
-            uActivo.tienda.activa = true;
-            _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id).then(() => location.reload());
-        }
     </script>
 </body>
 </html>
