@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FierroX Pro v2.8.1</title>
+    <title>FierroX Pro v2.8.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -81,6 +81,13 @@
             if(data) uActivo = data;
         }
 
+        function entrarApp() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            document.getElementById('nav-bar').classList.remove('hidden');
+            navegar('panel', document.querySelector('.nav-item'));
+        }
+
         function toggleMenu() {
             document.getElementById('side-menu').classList.toggle('open');
             document.getElementById('overlay').classList.toggle('hidden');
@@ -95,13 +102,6 @@
                 localStorage.setItem('sesion_fierrox', JSON.stringify(uActivo));
                 entrarApp();
             } else { alert("Acceso denegado"); }
-        }
-
-        function entrarApp() {
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('main-content').classList.remove('hidden');
-            document.getElementById('nav-bar').classList.remove('hidden');
-            navegar('panel', document.querySelector('.nav-item'));
         }
 
         function navegar(sec, el) {
@@ -119,21 +119,24 @@
             lucide.createIcons();
         }
 
+        // --- FEED PRINCIPAL ---
         async function renderFeedMuro(container) {
             container.innerHTML = `<div class="pt-12 px-8 mb-8 flex justify-between items-center"><img src="barra logo.png" class="h-6 opacity-30"><button onclick="perfilViendo=uActivo;renderPerfil(document.getElementById('section-body'),true)"><img src="${uActivo.foto}" class="w-8 h-8 rounded-full border border-white/20"></button></div><div id="feed-items"></div>`;
             const { data: posts } = await _supabase.from('Publicaciones').select('*, Perfiles(*)').order('id', {ascending:false});
             if(posts) {
                 for(let p of posts) {
-                    const { count: likes } = await _supabase.from('Interacciones').select('*', {count:'exact', head:true}).eq('post_id', p.id).eq('tipo', 'like');
-                    const { count: coms } = await _supabase.from('Comentarios').select('*', {count:'exact', head:true}).eq('post_id', p.id);
-                    const { data: checkLike } = await _supabase.from('Interacciones').select('*').eq('post_id', p.id).eq('usuario_id', uActivo.id).eq('tipo', 'like').single();
-                    document.getElementById('feed-items').innerHTML += renderPostCard(p, p.Perfiles, likes, coms, checkLike);
+                    const { count: nL } = await _supabase.from('Interacciones').select('*', {count:'exact', head:true}).eq('post_id', p.id).eq('tipo', 'like');
+                    const { count: nC } = await _supabase.from('Comentarios').select('*', {count:'exact', head:true}).eq('post_id', p.id);
+                    const { data: isL } = await _supabase.from('Interacciones').select('*').eq('post_id', p.id).eq('usuario_id', uActivo.id).single();
+                    const { data: isS } = await _supabase.from('Guardados').select('*').eq('post_id', p.id).eq('usuario_id', uActivo.id).single();
+                    
+                    document.getElementById('feed-items').innerHTML += renderPostCard(p, p.Perfiles, nL, nC, isL, isS);
                 }
             }
             lucide.createIcons();
         }
 
-        function renderPostCard(p, u, nLikes, nComs, isLiked) {
+        function renderPostCard(p, u, nLikes, nComs, isL, isS) {
             return `
             <div class="mb-14 border-b border-white/5 pb-10">
                 <div class="flex items-center gap-3 px-6 mb-4" onclick="verPerfilPublico(${u.id})">
@@ -146,20 +149,86 @@
                     <div class="flex justify-between items-center">
                         <div class="flex gap-6 items-center">
                             <button onclick="darLike(${p.id}, this)" class="flex items-center gap-2">
-                                <i data-lucide="heart" class="w-6 ${isLiked ? 'like-heart active' : ''}"></i>
+                                <i data-lucide="heart" class="w-6 ${isL ? 'like-heart active' : ''}"></i>
                                 <span class="text-[10px] font-black">${nLikes || 0}</span>
                             </button>
                             <button onclick="abrirComentarios(${p.id})" class="flex items-center gap-2">
                                 <i data-lucide="message-circle" class="w-6"></i>
                                 <span class="text-[10px] font-black">${nComs || 0}</span>
                             </button>
+                            <button onclick="compartirPost(${p.id}, '${p.descripcion}')"><i data-lucide="send" class="w-6"></i></button>
                         </div>
+                        <button onclick="guardarPost(${p.id}, this)">
+                            <i data-lucide="bookmark" class="w-6" style="${isS ? 'fill:white' : ''}"></i>
+                        </button>
                     </div>
                 </div>
             </div>`;
         }
 
-        // --- RENDER PERFIL CON CUADRO DE PUBLICACIÓN ---
+        // --- LÓGICA DE BOTONES (REPARADOS) ---
+        async function darLike(pid, btn) {
+            const h = btn.querySelector('i');
+            const s = btn.querySelector('span');
+            if(h.classList.contains('active')) {
+                await _supabase.from('Interacciones').delete().eq('post_id', pid).eq('usuario_id', uActivo.id);
+                h.classList.remove('active');
+                s.innerText = parseInt(s.innerText) - 1;
+            } else {
+                await _supabase.from('Interacciones').insert([{post_id: pid, usuario_id: uActivo.id}]);
+                h.classList.add('active');
+                s.innerText = parseInt(s.innerText) + 1;
+            }
+        }
+
+        async function abrirComentarios(pid) {
+            const modal = document.createElement('div');
+            modal.className = "fixed inset-0 z-[2000] bg-black flex flex-col";
+            modal.innerHTML = `
+                <div class="p-6 border-b border-white/5 flex items-center gap-4">
+                    <button onclick="this.parentElement.parentElement.remove()"><i data-lucide="arrow-left"></i></button>
+                    <p class="font-black text-xs uppercase">Comentarios</p>
+                </div>
+                <div id="box-coms" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
+                <div class="p-6 glass flex gap-4">
+                    <input id="in-com" placeholder="Escribe..." class="flex-1 bg-white/5 p-4 rounded-2xl outline-none">
+                    <button onclick="enviarComentario(${pid})" class="btn-premium px-6 rounded-2xl font-black">OK</button>
+                </div>`;
+            document.body.appendChild(modal);
+            lucide.createIcons();
+            const { data } = await _supabase.from('Comentarios').select('*, Perfiles(*)').eq('post_id', pid);
+            const box = document.getElementById('box-coms');
+            if(data) data.forEach(c => {
+                box.innerHTML += `<div class="flex gap-3"><img src="${c.Perfiles.foto}" class="w-8 h-8 rounded-full"><div class="bg-white/5 p-3 rounded-2xl"><p class="text-[9px] font-black text-red-500">${c.Perfiles.nombre}</p><p class="text-sm">${c.contenido}</p></div></div>`;
+            });
+        }
+
+        async function enviarComentario(pid) {
+            const txt = document.getElementById('in-com').value;
+            await _supabase.from('Comentarios').insert([{post_id: pid, usuario_id: uActivo.id, contenido: txt}]);
+            document.querySelector('.fixed.inset-0.z-\\[2000\\]').remove();
+            renderFeedMuro(document.getElementById('section-body'));
+        }
+
+        function compartirPost(pid, txt) {
+            const url = window.location.href + "?post=" + pid;
+            if(navigator.share) navigator.share({title: 'FierroX', text: txt, url: url});
+            else { navigator.clipboard.writeText(url); alert("Link copiado"); }
+        }
+
+        async function guardarPost(pid, btn) {
+            const icon = btn.querySelector('i');
+            const { data } = await _supabase.from('Guardados').select('*').eq('post_id', pid).eq('usuario_id', uActivo.id).single();
+            if(data) {
+                await _supabase.from('Guardados').delete().eq('post_id', pid).eq('usuario_id', uActivo.id);
+                icon.style.fill = "none";
+            } else {
+                await _supabase.from('Guardados').insert([{post_id: pid, usuario_id: uActivo.id}]);
+                icon.style.fill = "white";
+            }
+        }
+
+        // --- PERFIL Y MURO DE PUBLICACIÓN ---
         async function renderPerfil(container, esMio) {
             container.innerHTML = `
                 <div class="relative mb-28">
@@ -184,8 +253,7 @@
                     <button onclick="setTab('muro')" class="flex-1 py-4 text-[10px] font-black uppercase rounded-[2rem] ${tabActual==='muro'?'bg-red-600':'text-zinc-500'}">Muro</button>
                     <button onclick="setTab('catalogo')" class="flex-1 py-4 text-[10px] font-black uppercase rounded-[2rem] ${tabActual==='catalogo'?'bg-red-600':'text-zinc-500'}">Catálogo</button>
                 </div>
-                <div id="cont-perf" class="px-5"></div>
-            `;
+                <div id="cont-perf" class="px-5"></div>`;
             renderTabContent(esMio);
             lucide.createIcons();
         }
@@ -193,98 +261,46 @@
         function renderTabContent(esMio) {
             const cont = document.getElementById('cont-perf');
             if(tabActual === 'muro') {
-                // CUADRO DE PUBLICACIÓN SOLO SI ES MI PERFIL Y TIENDA
-                if(esMio && perfilViendo.es_tienda) {
+                if(esMio) {
                     cont.innerHTML = `
                     <div class="glass p-8 rounded-[3rem] mb-12 border-white/10 shadow-2xl">
-                        <textarea id="post-text" placeholder="¿QUÉ QUIERES ANUNCIAR HOY?" class="w-full bg-transparent text-sm font-bold p-2 outline-none uppercase h-24 text-white placeholder:text-zinc-600"></textarea>
-                        <div id="post-prev-box" class="hidden mb-6 rounded-3xl overflow-hidden border border-white/10 h-48">
-                            <img id="post-prev-img" class="w-full h-full object-cover">
-                        </div>
+                        <textarea id="post-text" placeholder="¿QUÉ QUIERES ANUNCIAR?" class="w-full bg-transparent text-sm font-bold p-2 outline-none uppercase h-24 text-white"></textarea>
+                        <div id="post-prev-box" class="hidden mb-6 rounded-3xl overflow-hidden h-48 border border-white/10"><img id="post-prev-img" class="w-full h-full object-cover"></div>
                         <div class="flex justify-between items-center pt-6 border-t border-white/5">
-                            <label class="cursor-pointer text-zinc-400 flex items-center gap-2 hover:text-white transition-colors">
-                                <i data-lucide="image" class="w-5"></i>
-                                <span class="text-[9px] font-black uppercase">Imagen</span>
-                                <input type="file" onchange="previsualizarPost(this)">
-                            </label>
-                            <button onclick="publicarEnMuro()" class="btn-premium px-10 py-4 rounded-2xl font-black text-[10px] uppercase italic">Publicar</button>
+                            <label class="cursor-pointer text-zinc-400 flex items-center gap-2"><i data-lucide="image" class="w-5"></i><span class="text-[9px] font-black uppercase">Imagen</span><input type="file" onchange="previsualizarPost(this)"></label>
+                            <button onclick="publicarEnMuro()" class="btn-premium px-10 py-4 rounded-2xl font-black text-[10px] uppercase">Publicar</button>
                         </div>
                     </div>`;
                 }
                 cargarMuroPerfil();
-            } else {
-                cont.innerHTML = `<div class="py-20 text-center opacity-20 font-black uppercase italic">Catálogo en construcción</div>`;
-            }
-            lucide.createIcons();
-        }
-
-        // --- LÓGICA DE PUBLICACIÓN ---
-        function previsualizarPost(input) {
-            if (input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    tempPostImg = e.target.result;
-                    document.getElementById('post-prev-img').src = tempPostImg;
-                    document.getElementById('post-prev-box').classList.remove('hidden');
-                };
-                reader.readAsDataURL(input.files[0]);
             }
         }
 
+        function previsualizarPost(input) { if (input.files[0]) { const r = new FileReader(); r.onload = e => { tempPostImg = e.target.result; document.getElementById('post-prev-img').src = tempPostImg; document.getElementById('post-prev-box').classList.remove('hidden'); }; r.readAsDataURL(input.files[0]); } }
+        
         async function publicarEnMuro() {
-            const texto = document.getElementById('post-text').value;
-            if (!texto && !tempPostImg) return alert("Escribe algo o sube una imagen");
-
-            const { error } = await _supabase.from('Publicaciones').insert([
-                { autor_id: uActivo.id, descripcion: texto, imagen: tempPostImg }
-            ]);
-
-            if (!error) {
-                tempPostImg = null;
-                renderPerfil(document.getElementById('section-body'), true);
-            } else {
-                alert("Error al publicar");
-            }
+            const txt = document.getElementById('post-text').value;
+            await _supabase.from('Publicaciones').insert([{ autor_id: uActivo.id, descripcion: txt, imagen: tempPostImg }]);
+            renderPerfil(document.getElementById('section-body'), true);
         }
 
         async function cargarMuroPerfil() {
             const { data } = await _supabase.from('Publicaciones').select('*').eq('autor_id', perfilViendo.id).order('id', {ascending:false});
             const cont = document.getElementById('cont-perf');
-            if(data) {
-                data.forEach(p => {
-                    cont.innerHTML += renderPostCard(p, perfilViendo, 0, 0, false);
-                });
-            }
+            if(data) data.forEach(p => cont.innerHTML += renderPostCard(p, perfilViendo, 0, 0, false, false));
             lucide.createIcons();
         }
 
-        // --- RESTO DE FUNCIONES ---
-        async function darLike(pid, btn) { /* Lógica de like */ }
-        async function toggleEdicion() {
-            if(modoEdicion) {
-                const n = document.getElementById('new-name').value;
-                await _supabase.from('Perfiles').update({ nombre: n }).eq('id', uActivo.id);
-                await actUser();
-                perfilViendo = uActivo;
-            }
-            modoEdicion = !modoEdicion;
-            renderPerfil(document.getElementById('section-body'), true);
-        }
-
-        async function editImg(input, tipo) {
-            const r = new FileReader();
-            r.onload = async e => {
-                const data = tipo === 'foto' ? { foto: e.target.result } : { banner: e.target.result };
-                await _supabase.from('Perfiles').update(data).eq('id', uActivo.id);
-                await actUser();
-                perfilViendo = uActivo;
-                renderPerfil(document.getElementById('section-body'), true);
-            };
-            r.readAsDataURL(input.files[0]);
-        }
-
+        async function editImg(input, tipo) { const r = new FileReader(); r.onload = async e => { const d = tipo === 'foto' ? { foto: e.target.result } : { banner: e.target.result }; await _supabase.from('Perfiles').update(d).eq('id', uActivo.id); await actUser(); perfilViendo = uActivo; renderPerfil(document.getElementById('section-body'), true); }; r.readAsDataURL(input.files[0]); }
+        async function toggleEdicion() { if(modoEdicion) { const n = document.getElementById('new-name').value; await _supabase.from('Perfiles').update({ nombre: n }).eq('id', uActivo.id); await actUser(); perfilViendo = uActivo; } modoEdicion = !modoEdicion; renderPerfil(document.getElementById('section-body'), true); }
         function setTab(t) { tabActual = t; renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id); }
         function cerrarSesion() { localStorage.removeItem('sesion_fierrox'); location.reload(); }
+        async function renderGuardados(container) {
+            container.innerHTML = `<div class="pt-16 px-10 mb-10"><h2 class="text-4xl font-black italic uppercase">Guardados</h2></div><div id="list-guardados"></div>`;
+            const { data } = await _supabase.from('Guardados').select('*, Publicaciones(*, Perfiles(*))').eq('usuario_id', uActivo.id);
+            if(data) data.forEach(g => document.getElementById('list-guardados').innerHTML += renderPostCard(g.Publicaciones, g.Publicaciones.Perfiles, 0, 0, false, true));
+            lucide.createIcons();
+        }
     </script>
 </body>
 </html>
