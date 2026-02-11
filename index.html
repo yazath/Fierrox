@@ -87,7 +87,7 @@
     </nav>
 
     <script>
-const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
+    const SB_URL = 'https://ykdhevlalqrjoorjctwa.supabase.co';
 const SB_KEY = 'sb_publishable_rQfM6eBNu4ZnzIQBVDYpJg_3Xq0PKoV';
 const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
@@ -95,9 +95,9 @@ let uActivo = null;
 let perfilViendo = null;
 let postActualComentando = null;
 let modoEdicion = false;
-let tabActual = 'muro'; // muro, catalogo, reseñas
+let tabActual = 'muro';
 
-// --- INICIO Y PERSISTENCIA ---
+// --- INICIO ---
 window.onload = async () => {
     const sesionGuardada = localStorage.getItem('sesion_fierrox');
     if (sesionGuardada) {
@@ -111,18 +111,8 @@ window.onload = async () => {
 function parseUserData(user) {
     user.posts = typeof user.posts === 'string' ? JSON.parse(user.posts) : user.posts || [];
     user.seguidores = typeof user.seguidores === 'string' ? JSON.parse(user.seguidores) : user.seguidores || [];
-    user.tienda = typeof user.tienda === 'string' ? JSON.parse(user.tienda) : user.tienda || { activa: false, productos: [], servicios: [], reseñas: [] };
-}
-
-async function iniciarSesion() {
-    const e = document.getElementById('login-email').value.toLowerCase();
-    const p = document.getElementById('login-pass').value;
-    const { data } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
-    if (data && data.pass === p) {
-        uActivo = data; parseUserData(uActivo);
-        localStorage.setItem('sesion_fierrox', JSON.stringify(uActivo));
-        entrarApp();
-    } else { alert("Datos incorrectos"); }
+    user.tienda = typeof user.tienda === 'string' ? JSON.parse(user.tienda) : user.tienda || { activa: false, catalogo: [], reseñas: [] };
+    user.canastilla = typeof user.canastilla === 'string' ? JSON.parse(user.canastilla) : user.canastilla || [];
 }
 
 function entrarApp() {
@@ -141,95 +131,118 @@ function navegar(sec, el) {
     const body = document.getElementById('section-body');
     const tit = document.getElementById('section-title');
     
-    tit.innerHTML = (sec === 'panel') ? '<img src="barra logo.png" class="h-8">' : '';
-    if(sec === 'panel') { perfilViendo = null; cargarFeedGlobal(body); }
-    else if(sec === 'menu') { perfilViendo = uActivo; renderPerfil(body, true); }
+    if(sec === 'panel') {
+        perfilViendo = null;
+        document.getElementById('main-header').classList.add('hidden'); // Para que la imagen llegue hasta arriba
+        cargarFeedGlobal(body);
+    } else {
+        document.getElementById('main-header').classList.remove('hidden');
+        tit.innerHTML = '';
+        if(sec === 'menu') { perfilViendo = uActivo; renderPerfil(body, true); }
+    }
     lucide.createIcons();
 }
 
-// --- PERFIL Y TIENDA ---
+// --- PERFIL ---
 function renderPerfil(container, esMio) {
-    const bannerImg = perfilViendo.tienda?.banner || 'https://via.placeholder.com/600x200';
     const esTienda = perfilViendo.tienda?.activa;
-
+    const bannerImg = esTienda ? (perfilViendo.tienda.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1000') : null;
+    
     container.innerHTML = `
         <div class="relative -mx-4 mb-20">
-            <div class="w-full h-60 relative overflow-hidden">
-                <img src="${bannerImg}" class="w-full h-full object-cover">
-                <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+            <div class="w-full h-56 relative overflow-hidden bg-zinc-950">
+                ${esTienda ? `<img id="v-banner" src="${bannerImg}" class="w-full h-full object-cover opacity-60">` : 
+                `<div class="w-full h-full bg-gradient-to-br from-zinc-900 to-black"></div>`}
+                <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent"></div>
+                
                 ${esMio ? `
-                <div class="absolute top-4 right-4 z-50">
-                    <button onclick="toggleMenuOptions()" class="bg-black/40 backdrop-blur-md p-3 rounded-2xl border border-white/10"><i data-lucide="menu" class="text-white w-6"></i></button>
-                    <div id="drop-menu" class="hidden absolute right-0 mt-3 w-48 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                <div class="absolute top-4 right-4 z-50 flex gap-2">
+                    <button onclick="toggleMenuOptions()" class="bg-black/60 backdrop-blur-xl p-3 rounded-2xl border border-white/10"><i data-lucide="menu" class="text-white w-6"></i></button>
+                    <div id="drop-menu" class="hidden absolute right-0 mt-14 w-56 bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
                         <button onclick="activarModoEdicion()" class="w-full p-4 text-[10px] font-black text-white uppercase text-left border-b border-white/5">Editar Perfil</button>
                         ${!esTienda ? `<button onclick="abrirModalTienda()" class="w-full p-4 text-[10px] font-black text-yellow-500 uppercase text-left border-b border-white/5">Crear Tienda</button>` : ''}
                         <button onclick="cerrarSesion()" class="w-full p-4 text-[10px] font-black text-red-500 uppercase text-left">Cerrar Sesión</button>
                     </div>
                 </div>` : ''}
+
+                ${modoEdicion && esTienda ? `
+                <label class="absolute inset-0 flex items-center justify-center bg-black/40 cursor-pointer">
+                    <span class="bg-white/10 p-3 rounded-full backdrop-blur-md border border-white/20"><i data-lucide="camera" class="text-white"></i></span>
+                    <input type="file" class="hidden" onchange="subirImg(this, 'banner')">
+                </label>` : ''}
             </div>
+            
             <div class="absolute -bottom-14 left-1/2 -translate-x-1/2">
-                <img src="${perfilViendo.foto}" class="w-32 h-32 rounded-full border-4 border-black object-cover shadow-2xl bg-black">
-                ${modoEdicion ? `<label class="absolute bottom-0 right-0 bg-red-600 p-2 rounded-full border-2 border-black cursor-pointer"><i data-lucide="edit-2" class="w-4 h-4 text-white"></i><input type="file" class="hidden" onchange="subirImg(this, 'foto')"></label>` : ''}
+                <div class="relative group">
+                    <img src="${perfilViendo.foto}" class="w-32 h-32 rounded-full border-4 border-black object-cover shadow-2xl">
+                    ${modoEdicion ? `<label class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center cursor-pointer"><i data-lucide="camera" class="text-white"></i><input type="file" class="hidden" onchange="subirImg(this, 'foto')"></label>` : ''}
+                </div>
             </div>
         </div>
 
         <div class="text-center mb-6 px-4">
-            <h2 class="text-2xl font-black italic uppercase text-white">${perfilViendo.nombre}</h2>
-            ${esTienda ? `<span class="bg-yellow-500 text-black text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-tighter">TIENDA OFICIAL</span>` : ''}
-            <p class="text-[11px] font-black text-red-600 uppercase mt-2 tracking-widest">${perfilViendo.seguidores.length} SEGUIDORES</p>
+            ${modoEdicion ? 
+                `<input id="edit-nombre" type="text" value="${perfilViendo.nombre}" class="bg-white/5 border border-red-600/50 text-center text-xl font-black italic uppercase rounded-2xl p-2 text-white w-full shadow-inner">` :
+                `<h2 class="text-2xl font-black italic uppercase text-white tracking-tighter">${perfilViendo.nombre}</h2>`
+            }
+            <div class="flex items-center justify-center gap-3 mt-2">
+                <p class="text-[10px] font-black text-red-600 uppercase italic tracking-widest">${perfilViendo.seguidores.length} SEGUIDORES</p>
+                <div class="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-full border border-white/5">
+                    <i data-lucide="star" class="w-3 fill-yellow-500 text-yellow-500"></i>
+                    <span class="text-[10px] font-black text-white">4.9</span>
+                </div>
+            </div>
         </div>
 
         ${esTienda ? `
-        <div class="flex justify-around border-b border-white/5 mb-6 pb-2">
-            <button onclick="setTab('muro')" class="text-[10px] font-black uppercase ${tabActual==='muro'?'text-red-600':'text-gray-500'}">Muro</button>
-            <button onclick="setTab('catalogo')" class="text-[10px] font-black uppercase ${tabActual==='catalogo'?'text-red-600':'text-gray-500'}">Catálogo</button>
-            <button onclick="setTab('reseñas')" class="text-[10px] font-black uppercase ${tabActual==='reseñas'?'text-red-600':'text-gray-500'}">Reseñas</button>
+        <div class="flex justify-around bg-zinc-900/50 p-1 rounded-full mx-4 mb-6 border border-white/5">
+            <button onclick="setTab('muro')" class="flex-1 py-2 text-[9px] font-black uppercase rounded-full ${tabActual==='muro'?'bg-red-600 text-white shadow-lg':'text-gray-500'}">Muro</button>
+            <button onclick="setTab('catalogo')" class="flex-1 py-2 text-[9px] font-black uppercase rounded-full ${tabActual==='catalogo'?'bg-red-600 text-white shadow-lg':'text-gray-500'}">Catálogo</button>
+            <button onclick="setTab('reseñas')" class="flex-1 py-2 text-[9px] font-black uppercase rounded-full ${tabActual==='reseñas'?'bg-red-600 text-white shadow-lg':'text-gray-500'}">Reseñas</button>
         </div>` : ''}
 
-        <div id="contenido-perfil" class="px-2 pb-24"></div>
+        <div id="contenido-perfil" class="px-2 pb-32"></div>
 
         ${modoEdicion ? `
-        <button onclick="finalizarEdicion()" class="fixed bottom-24 right-6 bg-green-600 text-white p-4 rounded-full shadow-2xl z-[100] flex items-center gap-2 font-black italic text-[10px] animate-bounce">
-            <i data-lucide="check"></i> FINALIZAR
+        <button onclick="finalizarEdicion()" class="fixed bottom-24 right-6 bg-green-600 text-white px-6 py-4 rounded-full shadow-[0_0_30px_rgba(22,163,74,0.4)] z-[500] flex items-center gap-2 font-black italic text-[11px] uppercase border-2 border-white/20">
+            <i data-lucide="save"></i> Guardar Cambios
         </button>` : ''}
     `;
     renderContenidoTab(esMio);
     lucide.createIcons();
 }
 
-function setTab(t) { tabActual = t; renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id); }
-
 function renderContenidoTab(esMio) {
     const cont = document.getElementById('contenido-perfil');
     if(tabActual === 'muro') {
         if(perfilViendo.tienda?.activa && esMio) {
             cont.innerHTML = `
-            <div class="glass p-5 rounded-[2.5rem] mb-8 border border-white/5">
-                <textarea id="p-txt" placeholder="PUBLICA UNA NOVEDAD DE TU TIENDA..." class="w-full bg-transparent text-[11px] font-bold p-2 outline-none italic uppercase h-16 text-white"></textarea>
+            <div class="bg-zinc-900/40 p-5 rounded-[2.5rem] mb-8 border border-white/5 mx-2">
+                <textarea id="p-txt" placeholder="¿QUÉ HAY DE NUEVO EN LA TIENDA?" class="w-full bg-transparent text-[11px] font-bold p-2 outline-none italic uppercase h-16 text-white"></textarea>
                 <div class="flex justify-between items-center mt-3 border-t border-white/10 pt-4">
-                    <label class="cursor-pointer text-gray-400"><i data-lucide="image" class="w-6"></i><input type="file" class="hidden" onchange="previewP(this)"></label>
-                    <button onclick="publicar()" class="bg-red-600 text-white px-8 py-2 rounded-full font-black text-[10px] italic">POSTEAR</button>
+                    <label class="cursor-pointer text-gray-500"><i data-lucide="image"></i><input type="file" class="hidden" onchange="previewP(this)"></label>
+                    <button onclick="publicar()" class="bg-red-600 text-white px-8 py-2 rounded-full font-black text-[10px] italic shadow-lg shadow-red-600/30">PUBLICAR</button>
                 </div>
-                <img id="p-prev" class="hidden w-full h-40 object-cover rounded-2xl mt-4">
+                <img id="p-prev" class="hidden w-full h-40 object-cover rounded-3xl mt-4 border border-white/10">
             </div>`;
         }
         perfilViendo.posts.forEach(p => { cont.innerHTML += crearHTMLPost(p, perfilViendo); });
     } else if(tabActual === 'catalogo') {
         cont.innerHTML = `
-            ${esMio ? `<button onclick="abrirModalNuevoItem()" class="w-full bg-white text-black p-4 rounded-2xl font-black italic text-[10px] uppercase mb-6">+ Agregar Producto o Servicio</button>` : ''}
-            <div class="grid grid-cols-1 gap-4">
+            ${esMio ? `<button onclick="abrirModalNuevoItem()" class="w-full bg-white text-black p-4 rounded-3xl font-black italic text-[10px] uppercase mb-6 shadow-xl">+ Nuevo Artículo / Servicio</button>` : ''}
+            <div class="grid grid-cols-2 gap-3 px-2">
                 ${(perfilViendo.tienda.catalogo || []).map(item => `
-                    <div class="bg-zinc-900 rounded-3xl overflow-hidden border border-white/5 relative">
-                        ${esMio ? `<button onclick="eliminarItemCatalogo(${item.id})" class="absolute top-4 right-4 bg-black/50 p-2 rounded-full text-red-500 z-10"><i data-lucide="trash-2" class="w-4"></i></button>` : ''}
-                        <img src="${item.imgs[0]}" class="w-full h-48 object-cover">
-                        <div class="p-4">
-                            <h4 class="font-black italic text-white uppercase text-sm">${item.nombre}</h4>
-                            <p class="text-[10px] text-gray-400 mt-1 line-clamp-3">${item.desc}</p>
-                            <div class="flex justify-between items-center mt-4">
-                                <span class="text-red-600 font-black italic text-lg">$${item.precio}</span>
+                    <div class="bg-zinc-900/60 rounded-3xl overflow-hidden border border-white/5 relative flex flex-col h-full">
+                        ${esMio ? `<button onclick="eliminarItemCatalogo(${item.id})" class="absolute top-2 right-2 bg-black/60 p-2 rounded-full text-red-500 z-10 backdrop-blur-md"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+                        <img src="${item.imgs[0]}" class="w-full h-32 object-cover">
+                        <div class="p-3 flex flex-col flex-1">
+                            <h4 class="font-black italic text-white uppercase text-[10px] leading-tight line-clamp-1">${item.nombre}</h4>
+                            <p class="text-[8px] text-gray-400 mt-1 line-clamp-2 leading-tight">${item.desc}</p>
+                            <div class="mt-auto pt-3">
+                                <span class="text-red-600 font-black italic text-xs">$${item.precio}</span>
                                 ${item.tipo === 'articulo' ? 
-                                    `<button class="bg-white text-black px-4 py-2 rounded-full font-black text-[9px]">AÑADIR CANASTILLA</button>` :
-                                    `<a href="https://wa.me/521234567890" class="bg-green-600 text-white px-4 py-2 rounded-full font-black text-[9px] flex items-center gap-1"><i data-lucide="phone" class="w-3"></i> COTIZAR</a>`
+                                    `<button onclick="agregarCanastilla(${JSON.stringify(item).replace(/"/g, '&quot;')})" class="w-full mt-2 bg-white text-black py-2 rounded-xl font-black text-[8px] uppercase">Añadir</button>` :
+                                    `<a href="https://wa.me/${item.whatsapp}" class="w-full mt-2 bg-green-600 text-white py-2 rounded-xl font-black text-[8px] uppercase flex items-center justify-center gap-1"><i data-lucide="phone" class="w-2"></i> WhatsApp</a>`
                                 }
                             </div>
                         </div>
@@ -237,143 +250,124 @@ function renderContenidoTab(esMio) {
                 `).join('')}
             </div>`;
     } else if(tabActual === 'reseñas') {
-        const avg = 4.5; // Simulado
-        cont.innerHTML = `
-            <div class="text-center py-10">
-                <div class="text-4xl font-black text-yellow-500 mb-2">${avg}</div>
-                <div class="flex justify-center gap-1 text-yellow-500 mb-4"><i data-lucide="star" class="fill-yellow-500"></i><i data-lucide="star" class="fill-yellow-500"></i><i data-lucide="star" class="fill-yellow-500"></i><i data-lucide="star" class="fill-yellow-500"></i><i data-lucide="star-half" class="fill-yellow-500"></i></div>
-                <p class="text-[10px] font-black uppercase text-gray-500">Basado en 12 reseñas de clientes</p>
-            </div>`;
+        cont.innerHTML = `<div class="space-y-4 px-2">
+            ${(perfilViendo.tienda.reseñas || []).map(r => `
+                <div class="bg-white/5 p-4 rounded-3xl border border-white/5">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-[9px] font-black italic text-red-600 uppercase">${r.usuario}</span>
+                        <div class="flex text-yellow-500"><i data-lucide="star" class="w-2 fill-yellow-500"></i><i data-lucide="star" class="w-2 fill-yellow-500"></i><i data-lucide="star" class="w-2 fill-yellow-500"></i></div>
+                    </div>
+                    <p class="text-[10px] text-gray-300 italic">"${r.txt}"</p>
+                </div>
+            `).join('<p class="text-center py-20 text-[9px] font-black text-gray-600 uppercase italic">Sin reseñas aún</p>')}
+        </div>`;
     }
 }
 
-// --- MODALES (TIENDA Y CATÁLOGO) ---
-function abrirModalTienda() {
-    const m = document.createElement('div');
-    m.id = "modal-tienda";
-    m.className = "fixed inset-0 z-[1000] bg-black flex items-center justify-center p-6";
-    m.innerHTML = `
-        <div class="w-full bg-zinc-900 rounded-[3rem] p-8 border border-white/10 relative">
-            <button onclick="this.closest('#modal-tienda').remove()" class="absolute top-6 right-6 text-gray-500"><i data-lucide="x"></i></button>
-            <h3 class="text-2xl font-black italic text-white uppercase mb-6">CONVIÉRTETE EN TIENDA</h3>
-            <ul class="space-y-4 mb-8">
-                <li class="flex gap-3 text-[11px] font-bold text-gray-300"><i data-lucide="check-circle" class="text-green-500 w-5"></i> Solo las tiendas pueden realizar publicaciones en el muro global.</li>
-                <li class="flex gap-3 text-[11px] font-bold text-gray-300"><i data-lucide="shopping-bag" class="text-green-500 w-5"></i> Vende artículos ilimitados con carrito de compras.</li>
-                <li class="flex gap-3 text-[11px] font-bold text-gray-300"><i data-lucide="tool" class="text-green-500 w-5"></i> Ofrece servicios con botón directo a WhatsApp.</li>
-                <li class="flex gap-3 text-[11px] font-bold text-gray-300"><i data-lucide="star" class="text-green-500 w-5"></i> Sistema de reseñas y calificación de 5 estrellas.</li>
-            </ul>
-            <div class="bg-white/5 p-6 rounded-3xl text-center mb-8">
-                <p class="text-gray-400 text-[10px] font-black uppercase mb-1">SUSCRIPCIÓN MENSUAL</p>
-                <h4 class="text-3xl font-black text-white">$600 <span class="text-sm font-medium">/ mes</span></h4>
-            </div>
-            <button onclick="confirmarTienda()" class="w-full bg-red-600 text-white p-5 rounded-full font-black italic uppercase text-sm shadow-xl shadow-red-600/20">CONFIRMAR Y ACTIVAR TIENDA</button>
-        </div>`;
-    document.body.appendChild(m);
-    lucide.createIcons();
+// --- LÓGICA DE EDICIÓN ---
+function activarModoEdicion() { modoEdicion = true; renderPerfil(document.getElementById('section-body'), true); toggleMenuOptions(); }
+
+async function finalizarEdicion() {
+    const nuevoNombre = document.getElementById('edit-nombre').value;
+    const ahora = Date.now();
+    const tresMeses = 90 * 24 * 60 * 60 * 1000;
+
+    if(nuevoNombre !== uActivo.nombre) {
+        if(uActivo.ultimoCambioNombre && (ahora - uActivo.ultimoCambioNombre < tresMeses)) {
+            const diasRestantes = Math.ceil((tresMeses - (ahora - uActivo.ultimoCambioNombre)) / (1000 * 60 * 60 * 24));
+            alert(`No puedes cambiar el nombre aún. Faltan ${diasRestantes} días.`);
+            return;
+        }
+        uActivo.nombre = nuevoNombre;
+        uActivo.ultimoCambioNombre = ahora;
+    }
+
+    await _supabase.from('Perfiles').update({ 
+        nombre: uActivo.nombre, 
+        ultimoCambioNombre: uActivo.ultimoCambioNombre,
+        foto: uActivo.foto,
+        tienda: JSON.stringify(uActivo.tienda)
+    }).eq('id', uActivo.id);
+
+    modoEdicion = false;
+    renderPerfil(document.getElementById('section-body'), true);
 }
 
-async function confirmarTienda() {
-    uActivo.tienda.activa = true;
-    uActivo.tienda.catalogo = [];
-    await _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id);
-    location.reload();
-}
-
+// --- ACCIONES COMERCIALES ---
 function abrirModalNuevoItem() {
     const m = document.createElement('div');
     m.id = "modal-item";
-    m.className = "fixed inset-0 z-[1000] bg-black/95 p-6 overflow-y-auto";
+    m.className = "fixed inset-0 z-[1000] bg-black/98 p-6 overflow-y-auto flex items-center justify-center";
     m.innerHTML = `
-        <div class="max-w-md mx-auto pt-10">
-            <h3 class="text-xl font-black italic text-white uppercase mb-6">NUEVA PUBLICACIÓN COMERCIAL</h3>
-            <div class="flex gap-4 mb-6">
-                <button onclick="setTipoItem('articulo')" id="btn-art" class="flex-1 bg-red-600 p-4 rounded-2xl font-black text-[10px] uppercase italic">Articulo</button>
-                <button onclick="setTipoItem('servicio')" id="btn-ser" class="flex-1 bg-zinc-800 p-4 rounded-2xl font-black text-[10px] uppercase italic">Servicio</button>
+        <div class="w-full max-w-sm bg-zinc-900 rounded-[3rem] p-8 border border-white/10 shadow-2xl">
+            <h3 class="text-xl font-black italic text-white uppercase mb-6 text-center">AGREGAR AL CATÁLOGO</h3>
+            <div class="flex gap-2 mb-6 bg-black p-1 rounded-2xl">
+                <button onclick="setTipoItem('articulo')" id="btn-art" class="flex-1 bg-red-600 py-3 rounded-xl font-black text-[10px] uppercase italic transition-all">Artículo</button>
+                <button onclick="setTipoItem('servicio')" id="btn-ser" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase italic transition-all text-gray-500">Servicio</button>
             </div>
             <div class="space-y-4">
-                <input id="it-nombre" type="text" placeholder="NOMBRE DEL PRODUCTO/SERVICIO" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-bold italic text-[11px]">
-                <textarea id="it-desc" maxlength="500" placeholder="DESCRIPCIÓN (MAX 500 PALABRAS)" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-bold italic text-[11px] h-32"></textarea>
-                <input id="it-precio" type="number" placeholder="PRECIO ($)" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-bold italic text-[11px]">
-                <div class="border-2 border-dashed border-white/10 p-8 rounded-2xl text-center">
-                    <label class="cursor-pointer text-gray-500 font-black text-[10px] uppercase">
-                        + Subir Imágenes
-                        <input type="file" multiple class="hidden" onchange="handleFotosItem(this)">
-                    </label>
-                    <div id="it-fotos-prev" class="flex gap-2 mt-4 flex-wrap"></div>
+                <input id="it-nombre" type="text" placeholder="NOMBRE" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-bold text-[11px] outline-none focus:border-red-600">
+                <textarea id="it-desc" maxlength="500" placeholder="DESCRIPCIÓN (MAX 500 PALABRAS)" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-bold text-[11px] h-24 outline-none focus:border-red-600"></textarea>
+                <input id="it-precio" type="number" placeholder="PRECIO ($)" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl text-white font-bold text-[11px] outline-none">
+                <div id="cont-whatsapp" class="hidden">
+                    <input id="it-wa" type="number" placeholder="WHATSAPP (Ej: 521...)" class="w-full bg-white/5 border border-green-600/50 p-4 rounded-2xl text-white font-bold text-[11px] outline-none">
                 </div>
-                <button onclick="guardarItem()" class="w-full bg-white text-black p-5 rounded-full font-black italic uppercase text-sm mt-8">PUBLICAR EN CATÁLOGO</button>
-                <button onclick="this.closest('#modal-item').remove()" class="w-full text-gray-500 font-black text-[10px] uppercase mt-4">Cancelar</button>
+                <div class="border-2 border-dashed border-white/10 p-6 rounded-2xl text-center">
+                    <label class="cursor-pointer text-gray-500 font-black text-[9px] uppercase block">Subir Fotos<input type="file" multiple class="hidden" onchange="handleFotosItem(this)"></label>
+                    <div id="it-fotos-prev" class="flex gap-2 mt-4 flex-wrap justify-center"></div>
+                </div>
+                <button onclick="guardarItem()" class="w-full bg-red-600 text-white p-5 rounded-full font-black italic uppercase text-xs shadow-lg shadow-red-600/30">PUBLICAR AHORA</button>
+                <button onclick="document.getElementById('modal-item').remove()" class="w-full text-gray-600 font-black text-[10px] uppercase pt-2">Cerrar</button>
             </div>
         </div>`;
     document.body.appendChild(m);
-    window.tempFotos = [];
-    window.tempTipo = 'articulo';
+    window.tempFotos = []; window.tempTipo = 'articulo';
+    lucide.createIcons();
 }
 
 function setTipoItem(t) {
     window.tempTipo = t;
-    document.getElementById('btn-art').className = t==='articulo' ? 'flex-1 bg-red-600 p-4 rounded-2xl font-black text-[10px] uppercase italic' : 'flex-1 bg-zinc-800 p-4 rounded-2xl font-black text-[10px] uppercase italic';
-    document.getElementById('btn-ser').className = t==='servicio' ? 'flex-1 bg-red-600 p-4 rounded-2xl font-black text-[10px] uppercase italic' : 'flex-1 bg-zinc-800 p-4 rounded-2xl font-black text-[10px] uppercase italic';
+    document.getElementById('btn-art').className = t==='articulo' ? 'flex-1 bg-red-600 py-3 rounded-xl font-black text-[10px] uppercase italic text-white' : 'flex-1 py-3 rounded-xl font-black text-[10px] uppercase italic text-gray-500';
+    document.getElementById('btn-ser').className = t==='servicio' ? 'flex-1 bg-red-600 py-3 rounded-xl font-black text-[10px] uppercase italic text-white' : 'flex-1 py-3 rounded-xl font-black text-[10px] uppercase italic text-gray-500';
+    document.getElementById('cont-whatsapp').classList.toggle('hidden', t!=='servicio');
 }
 
-function handleFotosItem(input) {
-    const files = Array.from(input.files);
-    files.forEach(f => {
-        const r = new FileReader();
-        r.onload = e => {
-            window.tempFotos.push(e.target.result);
-            document.getElementById('it-fotos-prev').innerHTML += `<img src="${e.target.result}" class="w-16 h-16 object-cover rounded-lg border border-white/20">`;
-        };
-        r.readAsDataURL(f);
-    });
+async function agregarCanastilla(item) {
+    uActivo.canastilla.push({ ...item, addedAt: Date.now() });
+    await _supabase.from('Perfiles').update({ canastilla: JSON.stringify(uActivo.canastilla) }).eq('id', uActivo.id);
+    alert("¡Agregado a tu canastilla!");
 }
 
-async function guardarItem() {
-    const item = {
-        id: Date.now(),
-        tipo: window.tempTipo,
-        nombre: document.getElementById('it-nombre').value,
-        desc: document.getElementById('it-desc').value,
-        precio: document.getElementById('it-precio').value,
-        imgs: window.tempFotos
-    };
-    uActivo.tienda.catalogo = uActivo.tienda.catalogo || [];
-    uActivo.tienda.catalogo.push(item);
-    await _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id);
-    location.reload();
-}
-
-async function eliminarItemCatalogo(id) {
-    if(!confirm("¿Eliminar del catálogo?")) return;
-    uActivo.tienda.catalogo = uActivo.tienda.catalogo.filter(i => i.id !== id);
-    await _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id);
-    renderPerfil(document.getElementById('section-body'), true);
-}
-
-// --- FUNCIONES DE FEED Y POSTS ---
+// --- POSTS Y FEED (SINCRONIZACIÓN CORREGIDA) ---
 function crearHTMLPost(p, uData) {
     const liked = p.likes?.includes(uActivo.id);
     const esMio = uData.id === uActivo.id;
     return `
-    <div class="feed-card mb-6 bg-zinc-900/40 rounded-[2.5rem] overflow-hidden border border-white/5 relative">
+    <div class="feed-card mb-6 bg-zinc-900/40 rounded-[2.5rem] overflow-hidden border border-white/5 relative mx-2">
         ${esMio ? `
-        <div class="absolute top-5 right-5 z-30">
-            <button onclick="togglePostMenu(${p.id})" class="text-gray-500 bg-black/20 p-2 rounded-full"><i data-lucide="more-vertical" class="w-5"></i></button>
-            <div id="menu-post-${p.id}" class="hidden absolute right-0 mt-2 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl w-36 z-50">
-                <button onclick="eliminarPost(${p.id})" class="w-full p-4 text-[10px] font-black text-red-500 uppercase italic text-left">Eliminar</button>
+        <div class="absolute top-5 right-5 z-40">
+            <button onclick="togglePostMenu(${p.id})" class="text-gray-500 bg-black/40 p-2 rounded-full backdrop-blur-md"><i data-lucide="more-vertical" class="w-5"></i></button>
+            <div id="menu-post-${p.id}" class="hidden absolute right-0 mt-2 bg-zinc-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl w-36">
+                <button onclick="eliminarPost(${uData.id}, ${p.id})" class="w-full p-4 text-[10px] font-black text-red-500 uppercase italic text-left">Eliminar</button>
             </div>
         </div>` : ''}
         <div class="p-5 flex items-center gap-3">
-            <img onclick="verPerfilPublico(${uData.id})" src="${uData.foto}" class="w-10 h-10 rounded-full object-cover border border-white/10">
-            <span class="text-[11px] font-black italic uppercase">${uData.nombre}</span>
+            <img onclick="verPerfilPublico(${uData.id})" src="${uData.foto}" class="w-10 h-10 rounded-full object-cover border border-white/10 cursor-pointer">
+            <span onclick="verPerfilPublico(${uData.id})" class="text-[11px] font-black italic uppercase cursor-pointer text-white">${uData.nombre}</span>
         </div>
         ${p.i ? `<img src="${p.i}" class="w-full object-cover max-h-[500px]">` : ''}
         <div class="p-5">
-            <p class="text-[12px] font-medium text-gray-200 mb-5 leading-relaxed">${p.d}</p>
-            <div class="flex justify-between border-t border-white/5 pt-4">
-                <button onclick="darLike(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black ${liked ? 'text-red-600' : 'text-gray-400'}"><i data-lucide="heart" class="w-5 ${liked?'fill-red-600':''}"></i> ${p.likes?.length || 0}</button>
-                <button onclick="abrirComentarios(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black text-gray-400"><i data-lucide="message-circle" class="w-5"></i> ${p.comentarios?.length || 0}</button>
-                <button onclick="alert('Copiado')" class="flex items-center gap-2 text-[10px] font-black text-gray-400"><i data-lucide="share-2" class="w-5"></i></button>
+            <p class="text-[12px] font-medium text-gray-300 mb-5 leading-snug italic uppercase">${p.d}</p>
+            <div class="flex justify-between items-center border-t border-white/5 pt-4">
+                <div class="flex gap-4">
+                    <button onclick="darLike(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black ${liked ? 'text-red-600' : 'text-gray-500'}">
+                        <i data-lucide="heart" class="w-5 ${liked ? 'fill-red-600' : ''}"></i> ${p.likes?.length || 0}
+                    </button>
+                    <button onclick="abrirComentarios(${uData.id}, ${p.id})" class="flex items-center gap-2 text-[10px] font-black text-gray-500">
+                        <i data-lucide="message-square" class="w-5"></i> ${p.comentarios?.length || 0}
+                    </button>
+                </div>
+                <button onclick="alert('Enlace copiado')" class="text-gray-500"><i data-lucide="share" class="w-5"></i></button>
             </div>
         </div>
     </div>`;
@@ -384,22 +378,147 @@ async function cargarFeedGlobal(container) {
     let todos = [];
     data.forEach(u => {
         const ps = typeof u.posts === 'string' ? JSON.parse(u.posts) : u.posts || [];
-        // Filtro: Solo las tiendas pueden aparecer en el muro global si activaste esa restricción
-        if(u.tienda && JSON.parse(typeof u.tienda === 'string' ? u.tienda : '{}').activa) {
+        const t = typeof u.tienda === 'string' ? JSON.parse(u.tienda) : u.tienda;
+        if(t && t.activa) {
             ps.forEach(p => todos.push({ ...p, uData: u }));
         }
     });
     todos.sort((a, b) => b.id - a.id);
-    container.innerHTML = todos.length > 0 ? todos.map(p => crearHTMLPost(p, p.uData)).join('') : '<p class="text-center py-20 text-[10px] font-black text-gray-600 uppercase">Solo las tiendas pueden publicar aquí</p>';
+    container.innerHTML = `<div class="pt-0">${todos.map(p => crearHTMLPost(p, p.uData)).join('')}</div>`;
     lucide.createIcons();
 }
 
-// --- EDICIÓN Y OTROS ---
-function activarModoEdicion() { modoEdicion = true; renderPerfil(document.getElementById('section-body'), true); toggleMenuOptions(); }
-function finalizarEdicion() { modoEdicion = false; renderPerfil(document.getElementById('section-body'), true); }
+async function darLike(userId, postId) {
+    const { data } = await _supabase.from('Perfiles').select('posts').eq('id', userId).single();
+    let ps = JSON.parse(typeof data.posts === 'string' ? data.posts : JSON.stringify(data.posts));
+    
+    ps = ps.map(p => {
+        if(p.id === postId) {
+            p.likes = p.likes || [];
+            if(p.likes.includes(uActivo.id)) p.likes = p.likes.filter(id => id !== uActivo.id);
+            else p.likes.push(uActivo.id);
+        }
+        return p;
+    });
+
+    await _supabase.from('Perfiles').update({ posts: JSON.stringify(ps) }).eq('id', userId);
+    
+    // Refresco inteligente
+    if(perfilViendo) {
+        const { data: nD } = await _supabase.from('Perfiles').select('*').eq('id', userId).single();
+        perfilViendo = nD; parseUserData(perfilViendo);
+        renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
+    } else {
+        cargarFeedGlobal(document.getElementById('section-body'));
+    }
+}
+
+async function eliminarPost(userId, postId) {
+    if(!confirm("¿Eliminar publicación?")) return;
+    const { data } = await _supabase.from('Perfiles').select('posts').eq('id', userId).single();
+    let ps = JSON.parse(data.posts);
+    ps = ps.filter(p => p.id !== postId);
+    await _supabase.from('Perfiles').update({ posts: JSON.stringify(ps) }).eq('id', userId);
+    if(perfilViendo) {
+        uActivo.posts = ps;
+        renderPerfil(document.getElementById('section-body'), true);
+    } else { cargarFeedGlobal(document.getElementById('section-body')); }
+}
+
+// --- COMENTARIOS ---
+async function abrirComentarios(userId, postId) {
+    postActualComentando = { userId, postId };
+    const { data } = await _supabase.from('Perfiles').select('posts').eq('id', userId).single();
+    const ps = JSON.parse(data.posts);
+    const post = ps.find(p => p.id === postId);
+    const coms = post.comentarios || [];
+
+    const modal = document.createElement('div');
+    modal.id = "modal-comentarios";
+    modal.className = "fixed inset-0 z-[600] bg-black/90 backdrop-blur-xl flex items-end";
+    modal.innerHTML = `
+        <div class="w-full bg-zinc-900 rounded-t-[3rem] p-6 max-h-[85vh] overflow-y-auto border-t border-white/10">
+            <div class="w-12 h-1 bg-white/20 mx-auto rounded-full mb-8" onclick="document.getElementById('modal-comentarios').remove()"></div>
+            <div class="space-y-6 mb-24">
+                ${coms.map(c => `
+                    <div class="flex gap-4">
+                        <img src="${c.foto}" class="w-10 h-10 rounded-full object-cover shadow-lg">
+                        <div class="bg-white/5 p-4 rounded-3xl flex-1 border border-white/5">
+                            <p class="text-[10px] font-black text-red-600 uppercase italic mb-1">${c.nombre}</p>
+                            <p class="text-[12px] text-gray-200 leading-relaxed">${c.txt}</p>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-center py-10 opacity-30 italic uppercase font-black text-[10px]">Sé el primero en comentar</p>'}
+            </div>
+            <div class="fixed bottom-0 left-0 right-0 p-4 bg-zinc-900 border-t border-white/5 flex gap-2">
+                <input type="text" id="in-coment" placeholder="Escribe algo..." class="flex-1 bg-white/5 p-4 rounded-full text-white text-[12px] outline-none">
+                <button onclick="enviarComent()" class="bg-red-600 p-4 rounded-full text-white shadow-lg"><i data-lucide="send" class="w-5"></i></button>
+            </div>
+        </div>`;
+    document.body.appendChild(modal);
+    lucide.createIcons();
+}
+
+async function enviarComent() {
+    const txt = document.getElementById('in-coment').value;
+    if(!txt) return;
+    const { userId, postId } = postActualComentando;
+    const { data } = await _supabase.from('Perfiles').select('posts').eq('id', userId).single();
+    let ps = JSON.parse(data.posts);
+    ps = ps.map(p => {
+        if(p.id === postId) {
+            p.comentarios = p.comentarios || [];
+            p.comentarios.push({ nombre: uActivo.nombre, foto: uActivo.foto, txt: txt });
+        }
+        return p;
+    });
+    await _supabase.from('Perfiles').update({ posts: JSON.stringify(ps) }).eq('id', userId);
+    document.getElementById('modal-comentarios').remove();
+    if(perfilViendo) {
+        const { data: nD } = await _supabase.from('Perfiles').select('*').eq('id', userId).single();
+        perfilViendo = nD; parseUserData(perfilViendo);
+        renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id);
+    } else { cargarFeedGlobal(document.getElementById('section-body')); }
+}
+
+// --- SOPORTE ---
+async function subirImg(input, tipo) {
+    if (input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base = e.target.result;
+            if(tipo === 'foto') uActivo.foto = base;
+            else uActivo.tienda.banner = base;
+            alert("Imagen cargada. Presiona 'Guardar Cambios' para finalizar.");
+            renderPerfil(document.getElementById('section-body'), true);
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function handleFotosItem(input) {
+    Array.from(input.files).forEach(f => {
+        const r = new FileReader();
+        r.onload = e => {
+            window.tempFotos.push(e.target.result);
+            document.getElementById('it-fotos-prev').innerHTML += `<img src="${e.target.result}" class="w-12 h-12 object-cover rounded-xl">`;
+        };
+        r.readAsDataURL(f);
+    });
+}
+
+async function guardarItem() {
+    const item = { id: Date.now(), tipo: window.tempTipo, nombre: document.getElementById('it-nombre').value, desc: document.getElementById('it-desc').value, precio: document.getElementById('it-precio').value, imgs: window.tempFotos, whatsapp: document.getElementById('it-wa').value };
+    uActivo.tienda.catalogo.push(item);
+    await _supabase.from('Perfiles').update({ tienda: JSON.stringify(uActivo.tienda) }).eq('id', uActivo.id);
+    document.getElementById('modal-item').remove();
+    renderPerfil(document.getElementById('section-body'), true);
+}
+
 function toggleMenuOptions() { document.getElementById('drop-menu').classList.toggle('hidden'); }
 function togglePostMenu(id) { document.getElementById(`menu-post-${id}`).classList.toggle('hidden'); }
 function cerrarSesion() { localStorage.removeItem('sesion_fierrox'); location.reload(); }
+function previewP(i) { if(i.files[0]) { const r = new FileReader(); r.onload=e=>{ const p=document.getElementById('p-prev'); p.src=e.target.result; p.classList.remove('hidden'); }; r.readAsDataURL(i.files[0]); } }
 
 async function publicar() {
     const txt = document.getElementById('p-txt').value;
@@ -409,23 +528,6 @@ async function publicar() {
     await _supabase.from('Perfiles').update({ posts: JSON.stringify(uActivo.posts) }).eq('id', uActivo.id);
     renderPerfil(document.getElementById('section-body'), true);
 }
-
-function previewP(i) { if(i.files[0]) { const r = new FileReader(); r.onload=e=>{ const p=document.getElementById('p-prev'); p.src=e.target.result; p.classList.remove('hidden'); }; r.readAsDataURL(i.files[0]); } }
-
-async function verPerfilPublico(id) {
-    const { data } = await _supabase.from('Perfiles').select('*').eq('id', id).single();
-    if(data) { perfilViendo = data; parseUserData(perfilViendo); renderPerfil(document.getElementById('section-body'), false); }
-}
-
-async function darLike(userId, postId) {
-    const { data } = await _supabase.from('Perfiles').select('posts').eq('id', userId).single();
-    let ps = typeof data.posts === 'string' ? JSON.parse(data.posts) : data.posts;
-    ps = ps.map(p => { if(p.id === postId) { p.likes = p.likes || []; if(p.likes.includes(uActivo.id)) p.likes = p.likes.filter(i=>i!==uActivo.id); else p.likes.push(uActivo.id); } return p; });
-    await _supabase.from('Perfiles').update({ posts: JSON.stringify(ps) }).eq('id', userId);
-    if(perfilViendo) { const {data:d}=await _supabase.from('Perfiles').select('*').eq('id',perfilViendo.id).single(); perfilViendo=d; parseUserData(perfilViendo); renderPerfil(document.getElementById('section-body'), perfilViendo.id===uActivo.id); } else navegar('panel');
-}
-// (Funciones de comentarios omitidas aquí por espacio pero deben mantenerse igual que antes)
-
 
 
     </script>
