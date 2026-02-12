@@ -48,20 +48,27 @@
     </nav>
 
     <script>
-        // CONFIGURACIÓN: Pon aquí tus datos de tu nueva base de datos
+        // CONFIGURACIÓN
         const SB_URL = 'https://vfugvtbzlxgqsmzcatzx.supabase.co';
         const SB_KEY = 'sb_publishable_tZ3gG7rC9CgbRsHrssem7Q_q5YWYeQD';
-        const ADMIN_EMAIL = 'yazathcardona@gmail.com; // <--- Pon tu email aquí para ser Admin
+        // CORRECCIÓN: Se cerró la comilla que faltaba aquí abajo
+        const ADMIN_EMAIL = 'yazathcardona@gmail.com'; 
 
         const _supabase = supabase.createClient(SB_URL, SB_KEY);
         let uActivo = null;
         let isLoginMode = true;
+
+        // Inicializar iconos de Lucide al cargar
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
 
         function toggleAuthMode() {
             isLoginMode = !isLoginMode;
             document.getElementById('reg-name').classList.toggle('hidden', isLoginMode);
             document.getElementById('auth-title').innerText = isLoginMode ? "Iniciar Sesión" : "Crear Cuenta";
             document.getElementById('btn-main-auth').innerText = isLoginMode ? "Entrar" : "Registrarme";
+            document.getElementById('btn-toggle-auth').innerText = isLoginMode ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia Sesión";
         }
 
         async function gestionarAuth() {
@@ -69,14 +76,29 @@
             const p = document.getElementById('login-pass').value;
             const n = document.getElementById('reg-name').value;
 
-            if (isLoginMode) {
-                const { data, error } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
-                if (data && data.pass === p) { uActivo = data; entrarApp(); } 
-                else { alert("Credenciales incorrectas"); }
-            } else {
-                const { data, error } = await _supabase.from('Perfiles').insert([{ nombre: n, email: e, pass: p }]).select().single();
-                if (error) alert("Error al registrar: " + error.message);
-                else { uActivo = data; entrarApp(); }
+            if (!e || !p) {
+                alert("Por favor rellena todos los campos");
+                return;
+            }
+
+            try {
+                if (isLoginMode) {
+                    const { data, error } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
+                    if (data && data.pass === p) { 
+                        uActivo = data; 
+                        entrarApp(); 
+                    } else { 
+                        alert("Credenciales incorrectas"); 
+                    }
+                } else {
+                    if (!n) { alert("Escribe tu nombre"); return; }
+                    const { data, error } = await _supabase.from('Perfiles').insert([{ nombre: n, email: e, pass: p }]).select().single();
+                    if (error) alert("Error al registrar: " + error.message);
+                    else { uActivo = data; entrarApp(); }
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error de conexión");
             }
         }
 
@@ -85,7 +107,6 @@
             document.getElementById('main-content').classList.remove('hidden');
             document.getElementById('nav-bar').classList.remove('hidden');
             
-            // Si eres el admin, mostramos el botón secreto
             if(uActivo.email === ADMIN_EMAIL) {
                 document.getElementById('nav-admin').classList.remove('hidden');
             }
@@ -97,11 +118,11 @@
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             if(el) el.classList.add('active');
             const body = document.getElementById('section-body');
-            body.innerHTML = '';
+            body.innerHTML = '<div class="p-20 text-center opacity-20">Cargando...</div>';
 
-            if(sec === 'panel') renderMuro(body);
+            if(sec === 'panel') await renderMuro(body);
             if(sec === 'menu') renderMenu(body);
-            if(sec === 'admin') renderAdmin(body);
+            if(sec === 'admin') await renderAdmin(body);
             if(sec === 'canastilla') body.innerHTML = '<h1 class="p-10 text-2xl font-black italic uppercase">Canastilla</h1>';
             
             lucide.createIcons();
@@ -110,21 +131,23 @@
         async function renderMuro(container) {
             const { data } = await _supabase.from('Publicaciones').select('*, Perfiles(*)').order('id', {ascending: false});
             container.innerHTML = `<h1 class="p-10 text-2xl font-black italic uppercase">Muro Global</h1>`;
-            if(data) {
+            if(data && data.length > 0) {
                 data.forEach(post => {
                     container.innerHTML += `
                     <div class="mb-10 px-6">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-full bg-zinc-800 border border-white/10"></div>
-                                <span class="text-[10px] font-bold uppercase tracking-widest">${post.Perfiles?.nombre}</span>
-                                ${post.Perfiles?.verificado ? '<i data-lucide="check-circle" class="w-3 text-blue-500"></i>' : ''}
+                                <span class="text-[10px] font-bold uppercase tracking-widest">${post.Perfiles?.nombre || 'Usuario'}</span>
+                                ${post.Perfiles?.verificado ? '<i data-lucide="check-circle" class="w-3 text-blue-500 inline-block ml-1"></i>' : ''}
                             </div>
                         </div>
                         <div class="bg-zinc-900 rounded-[2rem] aspect-video flex items-center justify-center text-zinc-700 font-black italic">POST IMAGE</div>
                         <p class="mt-4 text-sm text-zinc-400 px-2">${post.descripcion}</p>
                     </div>`;
                 });
+            } else {
+                container.innerHTML += `<p class="p-10 text-zinc-600 text-xs uppercase font-bold">No hay publicaciones aún</p>`;
             }
         }
 
@@ -139,30 +162,32 @@
             
             const { data } = await _supabase.from('Perfiles').select('*').limit(10);
             const list = document.getElementById('admin-user-list');
-            data.forEach(user => {
-                list.innerHTML += `
-                <div class="flex items-center justify-between bg-white/5 p-4 rounded-2xl">
-                    <div>
-                        <p class="text-[11px] font-bold uppercase">${user.nombre}</p>
-                        <p class="text-[9px] text-zinc-600">${user.email}</p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="verificarUser(${user.id}, ${!user.verificado})" class="p-2 ${user.verificado ? 'text-blue-500' : 'text-zinc-500'}"><i data-lucide="check-circle"></i></button>
-                        <button onclick="borrarUser(${user.id})" class="p-2 text-red-900"><i data-lucide="trash-2"></i></button>
-                    </div>
-                </div>`;
-            });
+            if(data) {
+                data.forEach(user => {
+                    list.innerHTML += `
+                    <div class="flex items-center justify-between bg-white/5 p-4 rounded-2xl">
+                        <div>
+                            <p class="text-[11px] font-bold uppercase">${user.nombre}</p>
+                            <p class="text-[9px] text-zinc-600">${user.email}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="verificarUser(${user.id}, ${!user.verificado})" class="p-2 ${user.verificado ? 'text-blue-500' : 'text-zinc-500'}"><i data-lucide="check-circle"></i></button>
+                            <button onclick="borrarUser(${user.id})" class="p-2 text-red-900"><i data-lucide="trash-2"></i></button>
+                        </div>
+                    </div>`;
+                });
+            }
             lucide.createIcons();
         }
 
         async function verificarUser(id, estado) {
             await _supabase.from('Perfiles').update({ verificado: estado }).eq('id', id);
-            alert("Estado de verificación actualizado");
+            alert("Estado actualizado");
             navegar('admin');
         }
 
         async function borrarUser(id) {
-            if(confirm("¿Seguro que quieres eliminar este usuario?")) {
+            if(confirm("¿Eliminar usuario?")) {
                 await _supabase.from('Perfiles').delete().eq('id', id);
                 navegar('admin');
             }
