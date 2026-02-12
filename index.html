@@ -38,14 +38,24 @@
     </aside>
 
     <section id="login-screen" class="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center px-8">
-        <img src="barra logo.png" class="h-10 mb-12">
-        <div class="glass p-10 rounded-[3rem] w-full max-w-sm border-white/5">
-            <input type="email" id="login-email" placeholder="EMAIL" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-4 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
-            <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-8 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
-            <button onclick="iniciarSesion()" class="w-full btn-premium text-white font-black py-5 rounded-2xl text-[11px] italic tracking-widest">ACCEDER</button>
-            <button onclick="mostrarRegistro()" class="w-full mt-4 border border-white/20 py-5 rounded-2xl text-[11px] font-black italic tracking-widest">
+    <img src="barra logo.png" class="h-10 mb-12">
 
-                <section id="register-screen" class="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center px-8 hidden">
+    <div class="glass p-10 rounded-[3rem] w-full max-w-sm border-white/5">
+        <input type="email" id="login-email" placeholder="EMAIL" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-4 text-center font-bold text-[11px] uppercase">
+        <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-8 text-center font-bold text-[11px] uppercase">
+
+        <button onclick="iniciarSesion()" class="w-full btn-premium text-white font-black py-5 rounded-2xl text-[11px] italic tracking-widest">
+            ACCEDER
+        </button>
+
+        <button onclick="mostrarRegistro()" class="w-full mt-4 border border-white/20 py-5 rounded-2xl text-[11px] font-black italic tracking-widest">
+            REGISTRARSE
+        </button>
+    </div>
+</section>
+
+
+<section id="register-screen" class="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center px-8 hidden">
     <img src="barra logo.png" class="h-10 mb-12">
 
     <div class="glass p-10 rounded-[3rem] w-full max-w-sm border-white/5">
@@ -61,23 +71,7 @@
             VOLVER
         </button>
     </div>
-                </section>
-    REGISTRARSE
-            </button>
-        </div>
-    </section>
-
-    <main id="main-content" class="hidden min-h-screen pb-40">
-        <div id="section-body" class="w-full max-w-xl mx-auto"></div>
-    </main>
-
-    <nav id="nav-bar" class="hidden fixed bottom-0 left-0 right-0 glass border-t border-white/5 px-8 pt-4 pb-10 z-[100]">
-        <div class="flex justify-around items-center max-w-md mx-auto">
-            <div onclick="navegar('panel', this)" class="nav-item active"><img src="barra logo.png" class="w-6"></div>
-            <div onclick="navegar('canastilla', this)" class="nav-item"><img src="barra canastilla.png" class="w-6"></div>
-            <div onclick="navegar('buscador', this)" class="nav-item"><img src="barra buscador.png" class="w-6"></div>
-            <div onclick="toggleMenu()" class="nav-item"><img src="barra menu.png" class="w-6"></div>
-        </div>
+</section>
     </nav>
 
     <script>
@@ -111,22 +105,22 @@
         }
 
         async function iniciarSesion() {
-    const email = document.getElementById('login-email').value.toLowerCase().trim();
+
+    const email = document.getElementById('login-email').value.trim();
     const pass = document.getElementById('login-pass').value;
 
     const { data, error } = await _supabase.auth.signInWithPassword({
-        email: email,
+        email,
         password: pass
     });
 
-    if(error) {
+    if(error){
         alert("Credenciales incorrectas");
         return;
     }
 
     const user = data.user;
 
-    // Obtener perfil
     const { data: perfil } = await _supabase
         .from('Perfiles')
         .select('*')
@@ -134,7 +128,7 @@
         .single();
 
     uActivo = perfil;
-    localStorage.setItem('sesion_fierrox', JSON.stringify(perfil));
+    localStorage.setItem("sesion_fierrox", JSON.stringify(perfil));
 
     entrarApp();
         }
@@ -376,15 +370,19 @@
         function checkWhatsApp(v) { document.getElementById('cat-ws').classList.toggle('hidden', v !== 'servicio'); }
 
         async function guardarEnCatalogo() {
-    const n = catNom.value;
-    const d = catDesc.value;
-    const p = catPre.value;
-    const t = tipoItem.value;
-    const ws = catWs.value;
 
-    if(!n || !tempPostImg) return alert("Falta nombre o imagen");
+    const n = document.getElementById("cat-nom").value;
+    const d = document.getElementById("cat-desc").value;
+    const p = document.getElementById("cat-pre").value;
+    const t = document.getElementById("tipo-item").value;
+    const ws = document.getElementById("cat-ws").value;
 
-    await _supabase.from('Productos').insert([{
+    if(!n || !tempPostImg){
+        alert("Falta nombre o imagen");
+        return;
+    }
+
+    const { error } = await _supabase.from('Productos').insert([{
         usuario_id: uActivo.id,
         nombre: n,
         descripcion: d,
@@ -393,6 +391,11 @@
         whatsapp: ws,
         imagen: tempPostImg
     }]);
+
+    if(error){
+        alert(error.message);
+        return;
+    }
 
     tempPostImg = null;
     document.querySelector('.fixed.inset-0.z-\\[4000\\]').remove();
@@ -500,50 +503,39 @@ function volverLogin() {
 }
 
         async function registrarUsuario() {
+
     const nombre = document.getElementById("reg-nombre").value.trim();
-    const email = document.getElementById("reg-email").value.trim().toLowerCase();
+    const email = document.getElementById("reg-email").value.trim();
     const pass = document.getElementById("reg-pass").value;
 
-    if(!nombre || !email || !pass) {
+    if(!nombre || !email || !pass){
         alert("Completa todos los campos");
         return;
     }
 
-    // 1️⃣ Crear usuario en Auth
     const { data, error } = await _supabase.auth.signUp({
-        email: email,
+        email,
         password: pass
     });
 
-    if(error) {
+    if(error){
         alert(error.message);
         return;
     }
 
     const user = data.user;
 
-    // 2️⃣ Crear perfil en tabla Perfiles
     await _supabase.from("Perfiles").insert([{
         id: user.id,
-        nombre: nombre,
-        email: email,
+        nombre,
+        email,
         foto: "https://i.imgur.com/HeIi0wU.png",
         banner: ""
     }]);
 
-    // 3️⃣ Guardar sesión local
-    uActivo = {
-        id: user.id,
-        nombre: nombre,
-        email: email,
-        foto: "https://i.imgur.com/HeIi0wU.png"
-    };
-
-    localStorage.setItem("sesion_fierrox", JSON.stringify(uActivo));
-
     alert("Cuenta creada correctamente");
 
-    entrarApp();
+    volverLogin();
         }
     </script>
 </body>
