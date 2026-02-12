@@ -43,6 +43,27 @@
             <input type="email" id="login-email" placeholder="EMAIL" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-4 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
             <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-8 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
             <button onclick="iniciarSesion()" class="w-full btn-premium text-white font-black py-5 rounded-2xl text-[11px] italic tracking-widest">ACCEDER</button>
+            <button onclick="mostrarRegistro()" class="w-full mt-4 border border-white/20 py-5 rounded-2xl text-[11px] font-black italic tracking-widest">
+
+                <section id="register-screen" class="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center px-8 hidden">
+    <img src="barra logo.png" class="h-10 mb-12">
+
+    <div class="glass p-10 rounded-[3rem] w-full max-w-sm border-white/5">
+        <input id="reg-nombre" placeholder="NOMBRE" class="w-full bg-white/5 p-5 rounded-2xl mb-4 text-center font-bold text-[11px] uppercase">
+        <input id="reg-email" placeholder="EMAIL" class="w-full bg-white/5 p-5 rounded-2xl mb-4 text-center font-bold text-[11px] uppercase">
+        <input id="reg-pass" type="password" placeholder="PASSWORD" class="w-full bg-white/5 p-5 rounded-2xl mb-8 text-center font-bold text-[11px] uppercase">
+
+        <button onclick="registrarUsuario()" class="w-full btn-premium py-5 rounded-2xl text-[11px] font-black italic">
+            CREAR CUENTA
+        </button>
+
+        <button onclick="volverLogin()" class="w-full mt-4 text-xs text-zinc-400 font-bold">
+            VOLVER
+        </button>
+    </div>
+                </section>
+    REGISTRARSE
+            </button>
         </div>
     </section>
 
@@ -90,14 +111,32 @@
         }
 
         async function iniciarSesion() {
-            const e = document.getElementById('login-email').value.toLowerCase().trim();
-            const p = document.getElementById('login-pass').value;
-            const { data } = await _supabase.from('Perfiles').select('*').eq('email', e).single();
-            if (data && data.pass === p) {
-                uActivo = data;
-                localStorage.setItem('sesion_fierrox', JSON.stringify(uActivo));
-                entrarApp();
-            } else { alert("Acceso denegado"); }
+    const email = document.getElementById('login-email').value.toLowerCase().trim();
+    const pass = document.getElementById('login-pass').value;
+
+    const { data, error } = await _supabase.auth.signInWithPassword({
+        email: email,
+        password: pass
+    });
+
+    if(error) {
+        alert("Credenciales incorrectas");
+        return;
+    }
+
+    const user = data.user;
+
+    // Obtener perfil
+    const { data: perfil } = await _supabase
+        .from('Perfiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+    uActivo = perfil;
+    localStorage.setItem('sesion_fierrox', JSON.stringify(perfil));
+
+    entrarApp();
         }
 
         function toggleMenu() {
@@ -449,6 +488,63 @@ async function guardarPostMuro() {
 
         function setTab(t) { tabActual = t; renderPerfil(document.getElementById('section-body'), perfilViendo.id === uActivo.id); }
         function cerrarSesion() { localStorage.removeItem('sesion_fierrox'); location.reload(); }
+
+        function mostrarRegistro() {
+    document.getElementById("login-screen").classList.add("hidden");
+    document.getElementById("register-screen").classList.remove("hidden");
+}
+
+function volverLogin() {
+    document.getElementById("register-screen").classList.add("hidden");
+    document.getElementById("login-screen").classList.remove("hidden");
+}
+
+        async function registrarUsuario() {
+    const nombre = document.getElementById("reg-nombre").value.trim();
+    const email = document.getElementById("reg-email").value.trim().toLowerCase();
+    const pass = document.getElementById("reg-pass").value;
+
+    if(!nombre || !email || !pass) {
+        alert("Completa todos los campos");
+        return;
+    }
+
+    // 1️⃣ Crear usuario en Auth
+    const { data, error } = await _supabase.auth.signUp({
+        email: email,
+        password: pass
+    });
+
+    if(error) {
+        alert(error.message);
+        return;
+    }
+
+    const user = data.user;
+
+    // 2️⃣ Crear perfil en tabla Perfiles
+    await _supabase.from("Perfiles").insert([{
+        id: user.id,
+        nombre: nombre,
+        email: email,
+        foto: "https://i.imgur.com/HeIi0wU.png",
+        banner: ""
+    }]);
+
+    // 3️⃣ Guardar sesión local
+    uActivo = {
+        id: user.id,
+        nombre: nombre,
+        email: email,
+        foto: "https://i.imgur.com/HeIi0wU.png"
+    };
+
+    localStorage.setItem("sesion_fierrox", JSON.stringify(uActivo));
+
+    alert("Cuenta creada correctamente");
+
+    entrarApp();
+        }
     </script>
 </body>
 </html>
