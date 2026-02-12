@@ -247,16 +247,18 @@ function renderTabTienda(container) {
         }
 
         function renderMenu(container) {
-            container.innerHTML = `
-            <div class="p-10 text-center pt-20">
-                <h2 class="text-xl font-black uppercase italic tracking-tighter">Opciones de Menu</h2>
-                <div class="mt-12 space-y-3">
-                    <button onclick="navegar('mi-perfil')" class="w-full glass py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest">Editar Perfil</button>
-                    ${uActivo.email === ADMIN_EMAIL ? `<button onclick="navegar('admin')" class="w-full glass py-5 rounded-3xl text-[10px] font-black text-red-500 uppercase tracking-widest">Panel de Control</button>` : ''}
-                    <button onclick="location.reload()" class="w-full bg-white/5 py-5 rounded-3xl text-[10px] font-black uppercase text-zinc-500">Cerrar Sesión</button>
-                </div>
-            </div>`;
-        }
+    container.innerHTML = `
+    <div class="p-10 text-center pt-20">
+        <h2 class="text-xl font-black uppercase italic tracking-tighter">Opciones de Menu</h2>
+        <div class="mt-12 space-y-3">
+            <button onclick="navegar('buscar')" class="w-full glass py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest">Explorar</button>
+            <button onclick="navegar('canastilla')" class="w-full glass py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest">Ver Guardados</button>
+            ${uActivo.email === ADMIN_EMAIL ? `<button onclick="navegar('admin')" class="w-full glass py-5 rounded-3xl text-[10px] font-black text-red-500 uppercase tracking-widest">Panel de Control</button>` : ''}
+            <button onclick="location.reload()" class="w-full bg-white/5 py-5 rounded-3xl text-[10px] font-black uppercase text-zinc-500">Cerrar Sesión</button>
+        </div>
+    </div>`;
+}
+
 
         async function renderMuro(container) {
             const { data } = await _supabase.from('Publicaciones').select('*, Perfiles(*)').order('id', {ascending: false});
@@ -298,57 +300,93 @@ function renderTabTienda(container) {
         async function borrarUser(id) { if(confirm("¿Eliminar?")) { await _supabase.from('Perfiles').delete().eq('id', id); navegar('admin'); } }
         function toggleAuthMode() { isLoginMode = !isLoginMode; document.getElementById('reg-name').classList.toggle('hidden', isLoginMode); }
 
-        // --- FUNCION PARA PUBLICAR POST ---
+        // --- PUBLICAR EN EL MURO ---
 async function subirPost() {
     const texto = document.getElementById('post-text').value;
     const fileInput = document.getElementById('post-file');
     const file = fileInput.files[0];
     let urlImagen = null;
 
-    if (!texto && !file) return alert("Escribe algo o selecciona una imagen");
+    if (!texto && !file) return alert("Escribe algo para compartir.");
 
-    // 1. Si hay imagen, subirla al Storage (Bucket: "fotos")
+    const btn = event.target;
+    btn.innerText = "PUBLICANDO...";
+    btn.disabled = true;
+
     if (file) {
-        const fileName = `${Date.now()}_${file.name}`;
+        const fileName = `post_${Date.now()}_${file.name}`;
         const { data, error } = await _supabase.storage.from('fotos').upload(fileName, file);
-        if (error) return alert("Error al subir imagen");
-        urlImagen = _supabase.storage.from('fotos').getPublicUrl(fileName).data.publicUrl;
+        if (!error) urlImagen = _supabase.storage.from('fotos').getPublicUrl(fileName).data.publicUrl;
     }
 
-    // 2. Guardar en la tabla Publicaciones
     const { error: dbError } = await _supabase.from('Publicaciones').insert([
         { perfil_id: uActivo.id, descripcion: texto, imagen: urlImagen }
     ]);
 
-    if (dbError) alert("Error al publicar");
-    else {
-        alert("¡Publicado con éxito!");
-        cerrarPublicador();
-        navegar('panel'); // Ir al muro para verla
+    if (!dbError) {
+        alert("Publicado correctamente");
+        navegar('panel');
+    } else {
+        alert("Error al guardar en base de datos");
+        btn.innerText = "PUBLICAR";
+        btn.disabled = false;
     }
 }
 
-// --- EDICIÓN DE PERFIL (LAPIZ) ---
-function activarEdicionGlobal() {
+// --- EDICIÓN PROFESIONAL DE PERFIL ---
+async function activarEdicionGlobal() {
     const checkFecha = () => {
         if (!uActivo.ultima_edicion_nombre) return true;
         const tresMeses = 90 * 24 * 60 * 60 * 1000;
         return (Date.now() - new Date(uActivo.ultima_edicion_nombre).getTime()) > tresMeses;
     };
 
-    const nuevoNombre = checkFecha() ? prompt("Nuevo nombre:", uActivo.nombre) : uActivo.nombre;
-    if (!checkFecha()) alert("El nombre solo se puede cambiar cada 3 meses");
-
-    if (confirm("¿Quieres cambiar la foto de perfil?")) document.getElementById('input-avatar').click();
-    if (confirm("¿Quieres cambiar el banner?")) document.getElementById('input-banner').click();
-
-    // Lógica para guardar nombre si cambió
-    if (nuevoNombre && nuevoNombre !== uActivo.nombre) {
-        actualizarDBPerfil({ nombre: nuevoNombre, ultima_edicion_nombre: new Date().toISOString() });
+    // Menú de opciones profesional
+    const op = confirm("¿Deseas editar el NOMBRE? (Solo cada 3 meses)\nPresiona CANCELAR para editar FOTOS.");
+    if (op) {
+        if (checkFecha()) {
+            const nuevoNombre = prompt("Introduce tu nuevo nombre:", uActivo.nombre);
+            if (nuevoNombre && nuevoNombre !== uActivo.nombre) {
+                await actualizarDBPerfil({ nombre: nuevoNombre, ultima_edicion_nombre: new Date().toISOString() });
+            }
+        } else {
+            alert("Aún no han pasado 3 meses desde tu último cambio de nombre.");
+        }
+    } else {
+        const fotoOp = confirm("¿Cambiar FOTO DE PERFIL? (Aceptar) o ¿Cambiar BANNER? (Cancelar)");
+        if (fotoOp) document.getElementById('input-avatar').click();
+        else document.getElementById('input-banner').click();
     }
 }
 
-// Auxiliar para actualizar perfil en DB
+// Escuchadores automáticos para las fotos
+document.addEventListener('change', async (e) => {
+    if (e.target.id === 'input-avatar' || e.target.id === 'input-banner') {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const tipo = e.target.id === 'input-avatar' ? 'avatar' : 'banner';
+        const fileName = `perfil_${uActivo.id}_${tipo}_${Date.now()}`;
+        
+        // Subir a bucket "fotos"
+        const { data, error } = await _supabase.storage.from('fotos').upload(fileName, file);
+        if (error) return alert("Error al subir imagen");
+        
+        const url = _supabase.storage.from('fotos').getPublicUrl(fileName).data.publicUrl;
+        await actualizarDBPerfil({ [tipo]: url });
+        alert(`${tipo.toUpperCase()} actualizado con éxito`);
+    }
+});
+
+async function actualizarDBPerfil(objeto) {
+    const { error } = await _supabase.from('Perfiles').update(objeto).eq('id', uActivo.id);
+    if (!error) {
+        Object.assign(uActivo, objeto);
+        navegar('mi-perfil');
+    }
+}
+
+// --- Actualizar perfi ---        
 async function actualizarDBPerfil(objeto) {
     const { error } = await _supabase.from('Perfiles').update(objeto).eq('id', uActivo.id);
     if (!error) {
