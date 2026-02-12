@@ -1,129 +1,231 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FierroX</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<style>
-body{background:black;color:white;font-family:Arial}
-.glass{background:rgba(255,255,255,.05);backdrop-filter:blur(15px)}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FierroX Pro v2.7</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: white; margin: 0; overflow-x: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .btn-premium { background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%); transition: 0.3s; }
+        .btn-premium:active { transform: scale(0.95); }
+        .hidden { display: none !important; }
+        input[type="file"] { display: none; }
+        .nav-item { transition: 0.3s; opacity: 0.4; }
+        .nav-item.active { opacity: 1; filter: drop-shadow(0 0 8px rgba(220,38,38,0.6)); }
+        .star-active { fill: #facc15; color: #facc15; }
+        .banner-container { width: 100%; height: 350px; position: relative; background: #111; overflow: hidden; }
+        .banner-img { width: 100%; height: 100%; object-fit: cover; }
+        .edit-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); opacity: 0; transition: 0.3s; }
+        .edit-overlay:hover { opacity: 1; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-subir { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    </style>
 </head>
-<body class="flex items-center justify-center h-screen">
+<body>
 
-<div class="glass p-10 rounded-3xl w-96 text-center space-y-4">
+    <section id="login-screen" class="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center px-8">
+        <img src="barra logo.png" class="h-10 mb-12">
+        <div class="glass p-10 rounded-[3rem] w-full max-w-sm border-white/5">
+            <input type="email" id="login-email" placeholder="EMAIL" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-4 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
+            <input type="password" id="login-pass" placeholder="PASSWORD" class="w-full bg-white/5 border border-white/10 p-5 rounded-2xl mb-8 text-center font-bold text-[11px] uppercase outline-none focus:border-red-600">
+            <button onclick="iniciarSesion()" class="w-full btn-premium text-white font-black py-5 rounded-2xl text-[11px] italic tracking-widest">ACCEDER</button>
+    <button onclick="registrarUsuario()" class="mt-3 text-xs opacity-60">
+CREAR CUENTA
+    </button>
+        </div>
+    </section>
 
-<h1 class="text-2xl font-bold">FierroX</h1>
+    <main id="main-content" class="hidden min-h-screen pb-40">
+        <div id="section-body" class="w-full max-w-xl mx-auto"></div>
+    </main>
 
-<input id="email" class="w-full p-3 rounded bg-black border" placeholder="Email">
-<input id="pass" type="password" class="w-full p-3 rounded bg-black border" placeholder="Password">
+    <nav id="nav-bar" class="hidden fixed bottom-0 left-0 right-0 glass border-t border-white/5 px-8 pt-4 pb-10 z-[100]">
+        <div class="flex justify-around items-center max-w-md mx-auto">
+            <div onclick="navegar('panel', this)" class="nav-item active"><img src="barra logo.png" class="w-6"></div>
+            <div onclick="navegar('canastilla', this)" class="nav-item"><img src="barra canastilla.png" class="w-6"></div>
+            <div onclick="navegar('buscador', this)" class="nav-item"><img src="barra buscador.png" class="w-6"></div>
+            <div onclick="navegar('menu', this)" class="nav-item"><img src="barra menu.png" class="w-6"></div>
+        </div>
+    </nav>
 
-<button onclick="registrar()" class="w-full bg-red-600 p-3 rounded font-bold">
-REGISTRARSE
-</button>
+    <script>
+        
+const SB_URL = 'https://fbeyqhwqmczselahzaer.supabase.co';
+const SB_KEY = 'sb_publishable_EhUhxyriBP4Wc7MiodXWVg_m8ovUtSq';
 
-<button onclick="login()" class="w-full bg-green-600 p-3 rounded font-bold">
-INICIAR SESIÓN
-</button>
+const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
-<button onclick="logout()" class="w-full bg-gray-700 p-3 rounded font-bold">
-CERRAR SESIÓN
-</button>
-
-<p id="estado" class="text-xs text-zinc-400"></p>
-
-</div>
-
-<script>
-/* ================================
-   🔴 PEGA TUS CLAVES AQUI
-================================ */
-
-const SUPABASE_URL = "https://fbeyqhwqmczselahzaer.supabase.co";
-const SUPABASE_KEY = "sb_publishable_EhUhxyriBP4Wc7MiodXWVg_m8ovUtSq";
-
-/* ================================ */
-
-const supa = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-/* ================================
-   REGISTRO
-================================ */
-
-async function registrar(){
-
-const email = document.getElementById("email").value;
-const pass = document.getElementById("pass").value;
-
-if(!email || !pass){
-alert("Ingresa datos");
-return;
-}
-
-const {error} = await supa.auth.signUp({
-email,
-password: pass
-});
-
-if(error){
-alert(error.message);
-return;
-}
-
-alert("Cuenta creada correctamente");
-}
-
-/* ================================
-   LOGIN
-================================ */
-
-async function login(){
-
-const email = document.getElementById("email").value;
-const pass = document.getElementById("pass").value;
-
-const {data,error} = await supa.auth.signInWithPassword({
-email,
-password: pass
-});
-
-if(error){
-alert(error.message);
-return;
-}
-
-document.getElementById("estado").innerText =
-"Sesión iniciada: " + data.user.email;
-}
-
-/* ================================
-   LOGOUT
-================================ */
-
-async function logout(){
-await supa.auth.signOut();
-document.getElementById("estado").innerText = "Sesión cerrada";
-}
-
-/* ================================
-   SESION ACTIVA AUTO
-================================ */
+let uActivo = null;
+let perfilViendo = null;
+let tabActual = 'muro';
+let tempPostImg = null;
+let tempProdImg = null;
+let itemTipoSeleccionado = 'articulo';
 
 window.onload = async () => {
+    const { data:{ session } } = await _supabase.auth.getSession();
 
-const {data} = await supa.auth.getSession();
+    if(session){
+        await cargarPerfil(session.user.id);
+        entrarApp();
+    }
 
-if(data.session){
-document.getElementById("estado").innerText =
-"Sesión activa: " + data.session.user.email;
+    lucide.createIcons();
+};
+
+async function cargarPerfil(uid){
+    const { data } = await _supabase
+        .from('Perfiles')
+        .select('*')
+        .eq('id', uid)
+        .single();
+
+    if(data){
+        uActivo = data;
+        uActivo.canastilla = uActivo.canastilla || [];
+    }
 }
 
-};
-</script>
+async function iniciarSesion(){
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
 
+    const { data, error } = await _supabase.auth.signInWithPassword({
+        email,
+        password: pass
+    });
+
+    if(error) return alert(error.message);
+
+    await cargarPerfil(data.user.id);
+    entrarApp();
+}
+
+async function registrarUsuario(){
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
+
+    const { data, error } = await _supabase.auth.signUp({
+        email,
+        password: pass
+    });
+
+    if(error) return alert(error.message);
+
+    // crear perfil automático
+    await _supabase.from('Perfiles').insert({
+        id: data.user.id,
+        email: email,
+        nombre: email.split("@")[0],
+        verificado: false,
+        canastilla: []
+    });
+
+    alert("Cuenta creada");
+}
+
+function entrarApp(){
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('main-content').classList.remove('hidden');
+    document.getElementById('nav-bar').classList.remove('hidden');
+    navegar('panel', document.querySelector('.nav-item'));
+}
+
+async function cerrarSesion(){
+    await _supabase.auth.signOut();
+    location.reload();
+}
+
+function navegar(sec, el){
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    if(el) el.classList.add('active');
+
+    const body = document.getElementById('section-body');
+    body.innerHTML = '';
+
+    if(sec==='panel'){ perfilViendo=null; renderFeedMuro(body); }
+    if(sec==='canastilla'){ renderCanastilla(body); }
+    if(sec==='menu'){ perfilViendo=uActivo; renderPerfil(body,true); }
+
+    lucide.createIcons();
+}
+
+async function renderFeedMuro(container){
+    container.innerHTML = `<div id="feed-items"></div>`;
+
+    const { data } = await _supabase
+        .from('Publicaciones')
+        .select('*, Perfiles(*)')
+        .order('id',{ascending:false});
+
+    document.getElementById('feed-items').innerHTML =
+        data.map(p => renderPostCard(p,p.Perfiles)).join('');
+}
+
+function renderPostCard(p,u){
+    return `
+    <div class="mb-12 border-b border-white/5 pb-8">
+        <div class="px-6 mb-4">
+            <p class="text-[10px] font-black uppercase">${u.nombre}</p>
+        </div>
+        ${p.imagen ? `<img src="${p.imagen}" class="w-full">` : ''}
+        <div class="px-8 mt-6">
+            <p class="text-[13px] text-zinc-300 mb-6">${p.descripcion}</p>
+            <button onclick="like(${p.id})">❤️</button>
+            <button onclick="guardar(${p.id})">🔖</button>
+        </div>
+    </div>`;
+}
+
+async function like(id){
+    await _supabase.from('Interacciones').insert({
+        usuario_id: uActivo.id,
+        post_id: id,
+        tipo: 'like'
+    });
+}
+
+async function guardar(id){
+    await _supabase.from('Interacciones').insert({
+        usuario_id: uActivo.id,
+        post_id: id,
+        tipo: 'save'
+    });
+}
+
+async function ejecutarPost(){
+    const txt = document.getElementById('p-txt').value;
+
+    await _supabase.from('Publicaciones').insert({
+        autor_id: uActivo.id,
+        descripcion: txt,
+        imagen: tempPostImg
+    });
+
+    renderPerfil(document.getElementById('section-body'), true);
+}
+
+       function mostrarRegistro() {
+    document.getElementById("login-screen").innerHTML = `
+    <div class="glass p-10 rounded-[3rem] w-full max-w-sm border-white/5">
+        <h2 class="text-center font-black mb-6">REGISTRO</h2>
+
+        <input id="reg-nombre" placeholder="NOMBRE" class="w-full bg-white/5 p-5 rounded-2xl mb-3 text-center">
+        <input id="reg-email" placeholder="EMAIL" class="w-full bg-white/5 p-5 rounded-2xl mb-3 text-center">
+        <input id="reg-pass" type="password" placeholder="PASSWORD" class="w-full bg-white/5 p-5 rounded-2xl mb-6 text-center">
+
+        <button onclick="registrarUsuario()" class="w-full btn-premium py-5 rounded-2xl">
+            CREAR CUENTA
+        </button>
+    </div>`;
+       }
+                    
+            
+    </script>
 </body>
 </html>
