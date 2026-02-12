@@ -118,7 +118,6 @@
         }
 
         function renderMiPerfil(container) {
-    // Estado interno para las pestañas del perfil
     let tabActiva = 'inicio';
 
     const actualizarVistaTab = () => {
@@ -135,17 +134,17 @@
             <img id="p-banner" src="${uActivo.banner || 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=1000'}" class="banner-img">
             <div class="banner-overlay"></div>
             
+            <button onclick="activarEdicionGlobal()" class="absolute top-4 right-4 z-[20] bg-black/50 backdrop-blur-md p-3 rounded-full border border-white/20 active:scale-90 transition-transform">
+                <i data-lucide="pencil" class="w-5 h-5 text-white"></i>
+            </button>
+            
             <div class="profile-avatar-center">
                 <img id="p-avatar" src="${uActivo.avatar || 'https://vfugvtbzlxgqsmzcatzx.supabase.co/storage/v1/object/public/imagenes/1000100891.png'}" class="w-full h-full object-cover">
-                <button onclick="activarEdicionPerfil()" class="absolute bottom-0 right-0 bg-red-600 p-2 rounded-full border-2 border-black shadow-lg">
-                    <i data-lucide="pencil" class="w-3 h-3 text-white"></i>
-                </button>
             </div>
         </div>
 
         <div class="mt-14 text-center px-6">
             <h2 id="p-display-name" class="text-2xl font-black uppercase italic tracking-tighter">${uActivo.nombre}</h2>
-            
             <div class="flex justify-center items-center gap-6 mt-4">
                 <div class="text-center">
                     <p class="text-lg font-black italic">${uActivo.seguidores || 0}</p>
@@ -153,13 +152,7 @@
                 </div>
                 <div class="h-8 w-[1px] bg-white/10"></div>
                 <div class="text-center">
-                    <div class="flex gap-1 text-yellow-500 mb-1">
-                        <i data-lucide="star" class="w-3 fill-current"></i>
-                        <i data-lucide="star" class="w-3 fill-current"></i>
-                        <i data-lucide="star" class="w-3 fill-current"></i>
-                        <i data-lucide="star" class="w-3 fill-current"></i>
-                        <i data-lucide="star" class="w-3 fill-current"></i>
-                    </div>
+                    <div class="flex gap-1 text-yellow-500 mb-1">${Array(5).fill('<i data-lucide="star" class="w-3 fill-current"></i>').join('')}</div>
                     <p class="text-[8px] text-zinc-500 uppercase font-bold tracking-widest">Rating Tienda</p>
                 </div>
             </div>
@@ -174,11 +167,11 @@
         <div id="perfil-tab-content" class="mt-6"></div>
     </div>
 
-    <input type="file" id="input-avatar" class="hidden" accept="image/*" onchange="subirImagen(this, 'avatar')">
-    <input type="file" id="input-banner" class="hidden" accept="image/*" onchange="subirImagen(this, 'banner')">
+    <input type="file" id="input-avatar" class="hidden" accept="image/*">
+    <input type="file" id="input-banner" class="hidden" accept="image/*">
+    <input type="file" id="post-file" class="hidden" accept="image/*">
     `;
 
-    // Función interna para cambiar pestañas
     window.cambiarTab = (tab, btn) => {
         tabActiva = tab;
         document.querySelectorAll('.tab-btn').forEach(b => {
@@ -192,6 +185,7 @@
 
     actualizarVistaTab();
 }
+
 
 // Apartado 1: INICIO (Publicar)
 function renderTabInicio(container) {
@@ -303,6 +297,81 @@ function renderTabTienda(container) {
         async function verificarUser(id, s) { await _supabase.from('Perfiles').update({ verificado: s }).eq('id', id); navegar('admin'); }
         async function borrarUser(id) { if(confirm("¿Eliminar?")) { await _supabase.from('Perfiles').delete().eq('id', id); navegar('admin'); } }
         function toggleAuthMode() { isLoginMode = !isLoginMode; document.getElementById('reg-name').classList.toggle('hidden', isLoginMode); }
+
+        // --- FUNCION PARA PUBLICAR POST ---
+async function subirPost() {
+    const texto = document.getElementById('post-text').value;
+    const fileInput = document.getElementById('post-file');
+    const file = fileInput.files[0];
+    let urlImagen = null;
+
+    if (!texto && !file) return alert("Escribe algo o selecciona una imagen");
+
+    // 1. Si hay imagen, subirla al Storage (Bucket: "fotos")
+    if (file) {
+        const fileName = `${Date.now()}_${file.name}`;
+        const { data, error } = await _supabase.storage.from('fotos').upload(fileName, file);
+        if (error) return alert("Error al subir imagen");
+        urlImagen = _supabase.storage.from('fotos').getPublicUrl(fileName).data.publicUrl;
+    }
+
+    // 2. Guardar en la tabla Publicaciones
+    const { error: dbError } = await _supabase.from('Publicaciones').insert([
+        { perfil_id: uActivo.id, descripcion: texto, imagen: urlImagen }
+    ]);
+
+    if (dbError) alert("Error al publicar");
+    else {
+        alert("¡Publicado con éxito!");
+        cerrarPublicador();
+        navegar('panel'); // Ir al muro para verla
+    }
+}
+
+// --- EDICIÓN DE PERFIL (LAPIZ) ---
+function activarEdicionGlobal() {
+    const checkFecha = () => {
+        if (!uActivo.ultima_edicion_nombre) return true;
+        const tresMeses = 90 * 24 * 60 * 60 * 1000;
+        return (Date.now() - new Date(uActivo.ultima_edicion_nombre).getTime()) > tresMeses;
+    };
+
+    const nuevoNombre = checkFecha() ? prompt("Nuevo nombre:", uActivo.nombre) : uActivo.nombre;
+    if (!checkFecha()) alert("El nombre solo se puede cambiar cada 3 meses");
+
+    if (confirm("¿Quieres cambiar la foto de perfil?")) document.getElementById('input-avatar').click();
+    if (confirm("¿Quieres cambiar el banner?")) document.getElementById('input-banner').click();
+
+    // Lógica para guardar nombre si cambió
+    if (nuevoNombre && nuevoNombre !== uActivo.nombre) {
+        actualizarDBPerfil({ nombre: nuevoNombre, ultima_edicion_nombre: new Date().toISOString() });
+    }
+}
+
+// Auxiliar para actualizar perfil en DB
+async function actualizarDBPerfil(objeto) {
+    const { error } = await _supabase.from('Perfiles').update(objeto).eq('id', uActivo.id);
+    if (!error) {
+        Object.assign(uActivo, objeto);
+        navegar('mi-perfil');
+    }
+}
+
+// --- MODALES PARA TIENDA (ARTICULO/SERVICIO) ---
+function abrirModalTienda(tipo) {
+    const nombre = prompt(`Nombre del ${tipo}:`);
+    const detalles = prompt(`Detalles del ${tipo}:`);
+    const valor = tipo === 'articulo' ? prompt("Precio:") : prompt("WhatsApp (ej: 521234567890):");
+
+    if (nombre && detalles && valor) {
+        // Aquí llamaríamos a una función similar a subirPost pero para la tabla Tienda
+        alert(`${tipo} listo para publicar (Falta subir imagen en este flujo)`);
+        // Para que esto sea 100% funcional necesitamos un modal HTML real, 
+        // ¿Quieres que diseñe el modal flotante para que no sea un "prompt" aburrido?
+    }
+}
+
+    
     </script>
 </body>
 </html>
