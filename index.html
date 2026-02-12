@@ -106,35 +106,40 @@
 
         async function iniciarSesion() {
 
-  const email = document.getElementById("login-email").value.trim().toLowerCase();
-  const pass = document.getElementById("login-pass").value.trim();
+    const email = document.getElementById("login-email").value.trim().toLowerCase();
+    const pass = document.getElementById("login-pass").value.trim();
 
-  if(!email || !pass){
-    alert("Ingresa email y contraseña");
-    return;
-  }
+    if(!email || !pass){
+        alert("Ingresa email y contraseña");
+        return;
+    }
 
-  const { data, error } = await _supabase.auth.signInWithPassword({
-    email: email,
-    password: pass
-  });
+    const { data, error } = await _supabase.auth.signInWithPassword({
+        email: email,
+        password: pass
+    });
 
-  if(error){
-    alert("Credenciales incorrectas");
-    console.log(error);
-    return;
-  }
+    if(error){
+        alert(error.message);
+        console.log(error);
+        return;
+    }
 
-  alert("Login correcto");
-        }
     const user = data.user;
 
-    const { data: perfil } = await _supabase
-        .from('Perfiles')
-        .select('*')
-        .eq('id', user.id)
+    // Obtener perfil
+    const { data: perfil, error: perr } = await _supabase
+        .from("Perfiles")
+        .select("*")
+        .eq("id", user.id)
         .single();
 
+    if(perr || !perfil){
+        alert("Perfil no encontrado");
+        return;
+    }
+
+    // Guardar sesión
     uActivo = perfil;
     localStorage.setItem("sesion_fierrox", JSON.stringify(perfil));
 
