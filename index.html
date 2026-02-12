@@ -23,6 +23,23 @@
         .profile-avatar-center { width: 100px; height: 100px; border-radius: 50%; border: 4px solid #000; position: absolute; bottom: -50px; left: 50%; transform: translateX(-50%); z-index: 10; background: #222; overflow: hidden; }
     </style>
 </head>
+<div id="modal-tienda" class="hidden fixed inset-0 z-[2000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+    <div class="glass w-full max-w-sm rounded-[3rem] p-8 border border-white/10">
+        <h3 id="modal-titulo" class="text-xl font-black uppercase italic italic text-red-600 mb-6 text-center">Nuevo Artículo</h3>
+        <div class="space-y-4">
+            <input type="text" id="t-nombre" placeholder="NOMBRE" class="w-full bg-white/5 p-4 rounded-2xl text-[11px] font-bold text-white outline-none border border-white/5 focus:border-red-600">
+            <textarea id="t-detalles" placeholder="DETALLES / DESCRIPCIÓN" class="w-full bg-white/5 p-4 rounded-2xl text-[11px] font-bold text-white outline-none border border-white/5 focus:border-red-600 h-24"></textarea>
+            <input type="text" id="t-valor" placeholder="PRECIO O WHATSAPP" class="w-full bg-white/5 p-4 rounded-2xl text-[11px] font-bold text-white outline-none border border-white/5 focus:border-red-600">
+            <button onclick="document.getElementById('t-file').click()" class="w-full bg-zinc-900 p-4 rounded-2xl text-[9px] font-black uppercase text-zinc-400 border border-dashed border-zinc-700 italic">Seleccionar Imagen</button>
+            <input type="file" id="t-file" class="hidden" accept="image/*">
+        </div>
+        <div class="flex gap-3 mt-8">
+            <button onclick="cerrarModalTienda()" class="flex-1 py-4 text-[10px] font-black uppercase text-zinc-500">Cancelar</button>
+            <button id="btn-publicar-tienda" class="flex-1 btn-premium py-4 rounded-2xl text-[10px] font-black uppercase">Publicar</button>
+        </div>
+    </div>
+</div>
+    
 <body>
 
     <section id="login-screen" class="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center px-8 text-center">
@@ -396,18 +413,56 @@ async function actualizarDBPerfil(objeto) {
 }
 
 // --- MODALES PARA TIENDA (ARTICULO/SERVICIO) ---
-function abrirModalTienda(tipo) {
-    const nombre = prompt(`Nombre del ${tipo}:`);
-    const detalles = prompt(`Detalles del ${tipo}:`);
-    const valor = tipo === 'articulo' ? prompt("Precio:") : prompt("WhatsApp (ej: 521234567890):");
+let tipoActualTienda = '';
 
-    if (nombre && detalles && valor) {
-        // Aquí llamaríamos a una función similar a subirPost pero para la tabla Tienda
-        alert(`${tipo} listo para publicar (Falta subir imagen en este flujo)`);
-        // Para que esto sea 100% funcional necesitamos un modal HTML real, 
-        // ¿Quieres que diseñe el modal flotante para que no sea un "prompt" aburrido?
+function abrirModalTienda(tipo) {
+    tipoActualTienda = tipo;
+    document.getElementById('modal-tienda').classList.remove('hidden');
+    document.getElementById('modal-titulo').innerText = tipo === 'articulo' ? 'Nuevo Artículo' : 'Nuevo Servicio';
+    document.getElementById('t-valor').placeholder = tipo === 'articulo' ? 'PRECIO (EJ: $500)' : 'WHATSAPP (EJ: 521...)';
+    
+    document.getElementById('btn-publicar-tienda').onclick = () => guardarEnTienda();
+}
+
+function cerrarModalTienda() {
+    document.getElementById('modal-tienda').classList.add('hidden');
+    document.getElementById('t-nombre').value = '';
+    document.getElementById('t-detalles').value = '';
+    document.getElementById('t-valor').value = '';
+}
+
+async function guardarEnTienda() {
+    const n = document.getElementById('t-nombre').value;
+    const d = document.getElementById('t-detalles').value;
+    const v = document.getElementById('t-valor').value;
+    const f = document.getElementById('t-file').files[0];
+    let img = null;
+
+    if(!n || !d || !v) return alert("Llena todos los campos");
+
+    if (f) {
+        const fName = `shop_${Date.now()}_${f.name}`;
+        const { data } = await _supabase.storage.from('fotos').upload(fName, f);
+        img = _supabase.storage.from('fotos').getPublicUrl(fName).data.publicUrl;
+    }
+
+    const { error } = await _supabase.from('Tienda').insert([{
+        perfil_id: uActivo.id,
+        tipo: tipoActualTienda,
+        nombre: n,
+        detalles: d,
+        precio: tipoActualTienda === 'articulo' ? v : null,
+        whatsapp: tipoActualTienda === 'servicio' ? v : null,
+        imagen: img
+    }]);
+
+    if(!error) {
+        alert("Agregado a tu tienda");
+        cerrarModalTienda();
+        navegar('mi-perfil');
     }
 }
+
 
     
     </script>
