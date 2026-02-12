@@ -167,31 +167,71 @@
 
         // --- REPARACIÓN DE INTERACCIONES ---
         async function darLike(pid, btn) {
-            const h = btn.querySelector('i');
-            const s = btn.querySelector('span');
-            let val = parseInt(s.innerText);
-            if(h.classList.contains('active')) {
-                await _supabase.from('Interacciones').delete().eq('post_id', pid).eq('usuario_id', uActivo.id);
-                h.classList.remove('active');
-                s.innerText = val - 1;
-            } else {
-                await _supabase.from('Interacciones').insert([{post_id: pid, usuario_id: uActivo.id, tipo: 'like'}]);
-                h.classList.add('active');
-                s.innerText = val + 1;
-            }
+    const h = btn.querySelector('i');
+    const s = btn.querySelector('span');
+
+    const { data } = await _supabase
+        .from('Interacciones')
+        .select('*')
+        .eq('post_id', pid)
+        .eq('usuario_id', uActivo.id);
+
+    if(data.length > 0) {
+        await _supabase.from('Interacciones').delete()
+        .eq('post_id', pid).eq('usuario_id', uActivo.id);
+
+        h.classList.remove('active');
+        s.innerText = parseInt(s.innerText) - 1;
+    } else {
+        await _supabase.from('Interacciones').insert([{
+            post_id: pid,
+            usuario_id: uActivo.id,
+            tipo: 'like'
+        }]);
+
+        h.classList.add('active');
+        s.innerText = parseInt(s.innerText) + 1;
+    }
         }
 
         async function guardarPost(pid, btn) {
-            const h = btn.querySelector('i');
-            const { data } = await _supabase.from('Guardados').select('*').eq('post_id', pid).eq('usuario_id', uActivo.id).single();
-            if(data) {
-                await _supabase.from('Guardados').delete().eq('post_id', pid).eq('usuario_id', uActivo.id);
-                h.style.fill = "none";
-            } else {
-                await _supabase.from('Guardados').insert([{post_id: pid, usuario_id: uActivo.id}]);
-                h.style.fill = "white";
-                h.style.color = "white";
-            }
+    const icon = btn.querySelector('i');
+
+    const { data } = await _supabase
+        .from('Guardados')
+        .select('*')
+        .eq('post_id', pid)
+        .eq('usuario_id', uActivo.id);
+
+    if(data.length > 0) {
+        await _supabase.from('Guardados').delete()
+        .eq('post_id', pid).eq('usuario_id', uActivo.id);
+
+        icon.style.fill = "none";
+    } else {
+        await _supabase.from('Guardados').insert([{
+            post_id: pid,
+            usuario_id: uActivo.id
+        }]);
+
+        icon.style.fill = "white";
+        icon.style.color = "white";
+    }
+        }
+
+        function compartirPost(id, txt) {
+    const link = location.href + "?post=" + id;
+
+    if(navigator.share) {
+        navigator.share({
+            title: "FierroX",
+            text: txt,
+            url: link
+        });
+    } else {
+        navigator.clipboard.writeText(link);
+        alert("Link copiado");
+    }
         }
 
         async function abrirComentarios(pid) {
@@ -297,19 +337,27 @@
         function checkWhatsApp(v) { document.getElementById('cat-ws').classList.toggle('hidden', v !== 'servicio'); }
 
         async function guardarEnCatalogo() {
-            const n = document.getElementById('cat-nom').value;
-            const d = document.getElementById('cat-desc').value;
-            const p = document.getElementById('cat-pre').value;
-            const t = document.getElementById('tipo-item').value;
-            const ws = document.getElementById('cat-ws').value;
-            if(!n || !tempPostImg) return alert("Falta nombre e imagen");
-            
-            await _supabase.from('Productos').insert([{
-                usuario_id: uActivo.id, nombre: n, descripcion: d, precio: p, tipo: t, whatsapp: ws, imagen: tempPostImg
-            }]);
-            tempPostImg = null;
-            document.querySelector('.fixed.inset-0.z-\\[4000\\]').remove();
-            setTab('catalogo');
+    const n = catNom.value;
+    const d = catDesc.value;
+    const p = catPre.value;
+    const t = tipoItem.value;
+    const ws = catWs.value;
+
+    if(!n || !tempPostImg) return alert("Falta nombre o imagen");
+
+    await _supabase.from('Productos').insert([{
+        usuario_id: uActivo.id,
+        nombre: n,
+        descripcion: d,
+        precio: p,
+        tipo: t,
+        whatsapp: ws,
+        imagen: tempPostImg
+    }]);
+
+    tempPostImg = null;
+    document.querySelector('.fixed.inset-0.z-\\[4000\\]').remove();
+    setTab("catalogo");
         }
 
         function prevF(input, imgId, boxId) {
@@ -323,6 +371,58 @@
                 r.readAsDataURL(input.files[0]);
             }
         }
+
+        //--- publicar ---
+function abrirPublicador() {
+    const m = document.createElement('div');
+    m.className = "fixed inset-0 z-[4000] bg-black/90 backdrop-blur-xl flex items-end";
+
+    m.innerHTML = `
+    <div class="w-full bg-zinc-950 rounded-t-[3rem] p-10 border-t border-white/10">
+        <div class="flex justify-between items-center mb-10">
+            <p class="font-black italic uppercase text-lg text-red-600">Nueva Publicación</p>
+            <button onclick="this.parentElement.parentElement.parentElement.remove()">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+
+        <textarea id="txt-post" placeholder="Escribe algo..."
+        class="w-full bg-white/5 p-5 rounded-2xl outline-none font-bold text-xs mb-6"></textarea>
+
+        <div id="prev-post" class="hidden h-40 rounded-2xl overflow-hidden mb-4 border border-white/10">
+            <img id="img-prev-post" class="w-full h-full object-cover">
+        </div>
+
+        <label class="block w-full text-center p-5 border-2 border-dashed border-white/10 rounded-2xl font-black text-[10px] uppercase text-zinc-500 cursor-pointer">
+            Subir Foto <input type="file" onchange="prevF(this,'img-prev-post','prev-post')">
+        </label>
+
+        <button onclick="guardarPostMuro()" class="w-full btn-premium py-6 rounded-2xl font-black italic uppercase tracking-widest mt-6">
+            Publicar
+        </button>
+    </div>`;
+
+    document.body.appendChild(m);
+    lucide.createIcons();
+}
+
+async function guardarPostMuro() {
+    const txt = document.getElementById("txt-post").value;
+
+    if(!txt && !tempPostImg) return alert("Escribe algo o sube imagen");
+
+    await _supabase.from("Publicaciones").insert([{
+        autor_id: uActivo.id,
+        descripcion: txt,
+        imagen: tempPostImg
+    }]);
+
+    tempPostImg = null;
+    document.querySelector('.fixed.inset-0.z-\\[4000\\]').remove();
+
+    setTab('muro');
+}
+        
 
         // --- FUNCIONES RESTANTES ---
         async function cargarCatalogoPerfil() {
